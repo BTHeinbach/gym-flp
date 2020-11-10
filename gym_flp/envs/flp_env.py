@@ -329,7 +329,7 @@ class fbsEnv(gym.Env):
                 
                 plt.show()
                 
-                plt.clear()
+                plt.cla()
                 plt.close("all")
         else:
             
