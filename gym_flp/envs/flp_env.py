@@ -300,6 +300,7 @@ class fbsEnv(gym.Env):
     def render(self, mode = 'rgb_array'):
         
         SCALE = 10 
+        clear_output(wait = False)
         
         if mode == "rgb_array":
             if self.state.ndim==1:
@@ -324,7 +325,7 @@ class fbsEnv(gym.Env):
                 plt.axis('off')
                 
                 display(fig)
-                clear_output(wait = False)
+                
                 
                 #plt.show()
                 
