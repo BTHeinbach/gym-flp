@@ -320,16 +320,16 @@ class fbsEnv(gym.Env):
                     data[SCALE*int(self.fac_y[i]-0.5*self.fac_lengths[i]):SCALE*int(self.fac_y[i]+0.5*self.fac_lengths[i]), SCALE*int(self.fac_x[i]-0.5*self.fac_widths[i]):SCALE*int(self.fac_x[i]+0.5*self.fac_widths[i])] = [R[s-1], G[s-1], B[s-1]]
                            
                 img = Image.fromarray(data, 'RGB')            
-                #plt.figure()
+                plt.figure()
                 fig = plt.imshow(img)
                 plt.axis('off')
                 
-                display(fig)
+                #display(fig)
                 
                 
-                #plt.show()
+                plt.show()
                 
-                #plt.clear()
+                plt.clear()
                 plt.close("all")
         else:
             
