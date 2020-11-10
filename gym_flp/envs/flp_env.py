@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from gym_flp import rewards
 import pygame
+from IPython.display import display, clear_output
 
 '''
 v0.0.3
