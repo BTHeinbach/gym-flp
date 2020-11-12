@@ -439,7 +439,7 @@ class mipEnv(gym.Env):
     metadata = {'render.modes' : ['human']}
           
     
-    def __init__(self, grid_size_x = 100, grid_size_y=100):
+    def __init__(self):
         
         # initialize distances for reward function
         self.act_d = 0
@@ -450,8 +450,8 @@ class mipEnv(gym.Env):
         self.reward = 0
         
         # Size of the 2D-grid
-        self.grid_size_x = grid_size_x
-        self.grid_size_y = grid_size_y
+        #self.grid_size_x = grid_size_x
+        #self.grid_size_y = grid_size_y
         
         self.box_pos_x = []
         self.box_pos_y = []
@@ -459,57 +459,45 @@ class mipEnv(gym.Env):
         self.last_box_pos_y = []
         
         '''
-        #For Testing
-        import numpy as np
-        import gym
-        from gym import spaces
-        grid_size_x = 100
-        grid_size_y = 100
-        #End Testing
+        kkb: hier kommt der neue Teil. Was passiert hier?
+        1. ich setze n auf 10, damit das richtige Problem in "getAreaData" gefunden wird. Bisher erlaubt sind 6, 10 und 12.
+        2. ich setze die min. Seitenlänge auf 5.
+        3. Ich lade einige Infos aus der Funkttion getAreaData, und zwar:
+            - self.W = Breite der "Halle" --> Grid
+            - self.H = Höhe der Halle --> Grid
+            - self.A = self.W x self.H
+            - self.chi = Orientierung (0 für horizontal, 1 für vertikal, oder andersrum. Ist egal, wird eh nicht gebraucht)
+            - self.h = Array mit den Höhen der Maschinen
+            - self.w = Array mit Breiten der Maschinen
+            - self.a = Array mit Flächen der MAschinen
+            - self.f = Flussmatrix
+        Nicht alle Werte sind immer Vorhanden!! Deshalb:
+        4. Ich checke, ob es in den Breiten oder Höhen Werte gibt. Wenn nein, dann:
+        5. Ich baue einen Random Array auf mit n Werten zwischen der minimalen Seitenlänge und der kleinsten Fläche geteilt durch die minimale Seitenlänge
+        6. Ich berechne die Höhen, indem ich die Flächen durch die Breiten teile.
         '''
-    
-        # Size of the boxes
-        self.n = 3 # number of boxes
+        
+        self.n = 6 #Set to 10 for testing purposes to obtain VC10
+        self.W, self.H, self.A, self.chi, self.h, self.w, self.a, self.F = self.getAreaData(self.n) #Pass 6 or 12 in test version
+
         n = self.n
+        W = self.W
+        H = self.H
+        w = self.w
+        h = self.h
+            
         
-        #choose size of boxes for testing
-        size_of_boxes = 'big'
-        if size_of_boxes == 'small':
-            box1_w = 10
-            box1_h = 8
-            box2_w = 5
-            box2_h = 4
-            box3_w = 7
-            box3_h = 7
-        elif size_of_boxes == 'medium':
-            box1_w = 20
-            box1_h = 16
-            box2_w = 10
-            box2_h = 8
-            box3_w = 14
-            box3_h = 14   
-        elif size_of_boxes == 'big':
-            box1_w = 40
-            box1_h = 32
-            box2_w = 20
-            box2_h = 16
-            box3_w = 28
-            box3_h = 28    
-        elif size_of_boxes == 'extreme':
-            box1_w = 60
-            box1_h = 50
-            box2_w = 40
-            box2_h = 35
-            box3_w = 40
-            box3_h = 40    
-        
-        
-        
-        box_w = [box1_w, box2_w, box3_w]
-        box_h = [box1_h, box2_h, box3_h]
-        
-        self.box_w = box_w
-        self.box_h = box_h
+        '''
+        Notation changed on 27.10.2020
+        grid_size_x -> W
+        grid_size_y -> H
+        min_edge -> min_side_length
+        box_w -> w
+        box_h -> h
+        '''
+
+        #self.box_w = box_w
+        #self.box_h = box_h
         
         # Calculate boundaries and write it in a list
         self.boundary_x = []
@@ -517,8 +505,8 @@ class mipEnv(gym.Env):
         boundary_x = self.boundary_x
         boundary_y = self.boundary_y
         for x in range(1, n+1):
-            boundary_x.append(grid_size_x-box_w[x-1])
-            boundary_y.append(grid_size_y-box_h[x-1])
+            boundary_x.append(W-w[x-1])
+            boundary_y.append(H-h[x-1])
             
         action_dict = {}   
         for i in range(1, n+1):
@@ -537,56 +525,142 @@ class mipEnv(gym.Env):
         for i in range(0, n):
             observation_low.append(0) #box_pos_x
             observation_low.append(0) #box_pos_y
-            observation_low.append(box_w[i]) #box_w
-            observation_low.append(box_h[i]) #box_h
+            observation_low.append(w[i]) #box_w
+            observation_low.append(h[i]) #box_h
             observation_low.append(0) #Rotation
             
         observation_high = []
         for i in range(0, n):
             observation_high.append(boundary_x[i]) #box_pos_x
             observation_high.append(boundary_y[i]) #box_pos_y
-            observation_high.append(box_w[i]) #box_w
-            observation_high.append(box_h[i]) #box_h
+            observation_high.append(w[i]) #box_w
+            observation_high.append(h[i]) #box_h
             observation_high.append(3) #Rotation
             
         #self.observation_space = spaces.Box(observation_low, observation_high)
         self.observation_space = spaces.Box(np.array(observation_low), np.array(observation_high), dtype = int)
         
+    def getAreaData(self, n):
+        min_side_length = 5
+        
+        W6 = 30
+        W12 = 60
+        H6 = None
+        H12 = None
+        
+        scale = 2
+        W10 = int(51*scale)
+        H10 = int(25*scale)
+        A10 = H10 * W10
+        
+        l10_min = 5
+        
+        
+        A6 = W6*W6
+        A12 = W12*W12
+        
+        chi6 = np.array([1,0,0,1,0,1], dtype = np.int)  #Rotation
+        w6 = np.array([5,9,6,6,4,5], dtype = np.float32)
+        h6 = np.array([4,8,5,4,4,3], dtype = np.float32)
+        a6 = w6*h6
+        
+        chi12 = np.array([1,0,1,0,0,1,1,0,1,0,0,1], dtype = np.int) #Rotation
+        w12 = np.array([5,7,6,4,6,5,10,7,6,5,5,6], dtype = np.float32)
+        h12 = np.array([4,5,5,4,6,4,7,5,5,5,5,4], dtype = np.float32)
+        a12 = w12*h12
+        
+        a10 = np.array([238,112,160,80,120,80,60,85,221,119])
+        chi10 = None
+        w10 = None
+        h10 = None
+        
+        F6_1 = np.array([[0,12,10,4,0,0],\
+                        [0,0,34,30,0,0],\
+                        [0,0,0,6,4,18],\
+                        [0,0,0,0,0,0],\
+                        [0,0,0,0,0,0]], dtype = np.float32)
+        
+        
+        F10_1 = np.array([[0,0,0, 0, 0,218, 0,  0,  0,  0],\
+                          [0,0,0, 0, 0,148, 0,  0,296,  0],\
+                          [0,0,0,28,70,  0, 0,  0,  0,  0],\
+                          [0,0,0, 0, 0, 28,70,140,  0,  0],\
+                          [0,0,0, 0, 0,  0, 0,210,  0,  0],\
+                          [0,0,0, 0, 0,  0, 0,  0,  0, 20],\
+                          [0,0,0, 0, 0,  0, 0,  0,  0, 28],\
+                          [0,0,0, 0, 0,  0, 0,  0,  0,888],\
+                          [0,0,0, 0, 0,  0, 0,  0,  0, 59.2],\
+                          [0,0,0, 0, 0,  0, 0,  0,  0,  0]])    
+        
+        F12_1 = np.array([[0,18,6,12,2,20,18,10,38,20,26,26],\
+                         [0, 0,0, 0,0, 0, 0, 0, 0, 0,18, 0],\
+                         [0, 0,0, 0,4, 4,14,30,16,36,32,38],\
+                         [0,0,0,0,0,8, 0, 0, 0, 0, 0, 0, 0],\
+                         [0,0,0,0,0,0,10, 2,34,30, 6,14,24],\
+                         [0,0,0,0,0,0, 0, 0, 0, 0,14, 0, 0],\
+                         [0,0,0,0,0,0, 0, 0,36,12,20, 4,28],\
+                         [0,0,0,0,0,0, 0, 0, 0, 0, 0, 6, 0],\
+                         [0,0,0,0,0,0, 0, 0, 0, 0, 8,22,12],\
+                         [0,0,0,0,0,0, 0, 0, 0, 0, 0, 0, 0],\
+                         [0,0,0,0,0,0, 0, 0, 0, 0, 0, 0, 6]])
+        
+            
+        if n == 6:
+            W, H, A, chi, h, w, a, F = W6, H6, A6,chi6, h6, w6, a6, F6_1
+        elif n ==12:
+            W, H, A, chi, h, w, a, F = W12, H12, A12, chi12, h12, w12, a12, F12_1
+        elif n == 10:
+            W, H, A, chi, h, w, a, F = W10, H10, A10, chi10, h10, w10, a10, F10_1
+            
+        if H == None:
+            H = W
+        elif W == None:
+            W = H
+        
+        if w is None or h is None:
+            w = np.random.randint(min_side_length, a/min_side_length, size=(n, ))
+            h = a/w 
+            while H <= any(h) or W <= any(w):
+                w = np.random.randint(min_side_length, a/min_side_length, size=(n, ))
+                h = a/w
+                print('take new h and w for beginning')
+                    
+        
+        return W, H, A, chi, h, w, a, F
 
-    def collision_test(self, box_pos_x, box_pos_y):      
-        grid_size_x = self.grid_size_x
-        grid_size_y = self.grid_size_y
+    def collision_test(self, box_pos_x, box_pos_y, h, w):      
+        #grid_size_x = self.grid_size_x
+        #grid_size_y = self.grid_size_y
         n = self.n
-        box_w = self.box_w
-        box_h = self.box_h
+        #box_w = self.box_w
+        #box_h = self.box_h
         #box_pos_x = self.box_pos_x 
         #box_pos_y = self.box_pos_y
         
-        # collision test - part1: create grid and fill it with boxes
-        grid = np.zeros((grid_size_y, grid_size_x))
-        for i in range (0, n):
-            box = np.zeros((box_h[i], box_w[i]))
-            box.fill(i+1)
-            grid[(box_pos_y[i]):(box_pos_y[i]+box_h[i]), (box_pos_x[i]):(box_pos_x[i]+box_w[i])] = box
-        
-        # collision test - part2: test if boxes collide
+        # collision test
         collision = False #initialize collision for each collision test
         
+    
+        
         for i in range (0, n-1):
-            if np.any(grid[(box_pos_y[i]):(box_pos_y[i]+box_h[i]), (box_pos_x[i]):(box_pos_x[i]+box_w[i])] != i+1) == True:
-                collision = True
+            for j in range (i+1,n):                
+                if (box_pos_x[i] < box_pos_x[j]+w[j] and box_pos_x[j] < box_pos_x[i]+w[i]) and (box_pos_y[i] < box_pos_y[j]+h[j] and box_pos_y[j] < box_pos_y[i]+h[i]):
+                    collision = True
+              
         
         if collision == True:
             print('collision detected')
                 
         return collision
 
-    def step(self, action):        
+    def step(self, action, state):        
         n = self.n
         #box_pos_x = self.box_pos_x 
         #box_pos_y = self.box_pos_y
         #box_w = self.box_w
         #box_h = self.box_h
+        w = self.w
+        h = self.h
         #grid_size_x = self.grid_size_x
         #grid_size_y = self.grid_size_y
         list_d = self.list_d
@@ -612,16 +686,18 @@ class mipEnv(gym.Env):
             box_pos_y.append(state[5*i+1])
         
         # Test if initial state causing a collision. If yes than initialize a new state until there is no collision
-        collision = mipEnv.collision_test(self, box_pos_x, box_pos_y)        
+        collision = mipEnv.collision_test(self, box_pos_x, box_pos_y, h, w)        
         while collision == True:
             new_state = mipEnv.reset(self)
+            W, H, A, chi, h, w, a, F = mipEnv.getAreaData(self, n)
             box_pos_x = []
             box_pos_y = []
             for i in range(0, n):
                 box_pos_x.append(new_state[5*i+0])
                 box_pos_y.append(new_state[5*i+1])
-            collision = mipEnv.collision_test(self, box_pos_x, box_pos_y)        
+            collision = mipEnv.collision_test(self, box_pos_x, box_pos_y, h, w)        
             print('take new state for the beginning')
+            print(box_pos_x, box_pos_y, w, h) 
         
         
         # check if boundary is reached
@@ -630,23 +706,27 @@ class mipEnv(gym.Env):
         up_bound = []
         down_bound = []
         for i in range(0,n):
-            if box_pos_x[i] == 0:
+            if box_pos_x[i] <= 0:
                 left_bound.append(True)
+                print('left bound reached, Facility',m)
             else:
                 left_bound.append(False)
             
-            if box_pos_x[i] == boundary_x[i]:
+            if box_pos_x[i] >= boundary_x[i]-1:
                 right_bound.append(True)
+                print('right bound reached, Facility',m)
             else:
                 right_bound.append(False)
                 
-            if box_pos_y[i] == 0:
+            if box_pos_y[i] <= 0:
                 down_bound.append(True)
+                print('lower bound reached, Facility',m)
             else:
                 down_bound.append(False)
                 
-            if box_pos_y[i] == boundary_y[i]:
+            if box_pos_y[i] >= boundary_y[i]-1:
                 up_bound.append(True)
+                print('upper bound reached, Facility',m)
             else:
                 up_bound.append(False)
                 
@@ -688,7 +768,7 @@ class mipEnv(gym.Env):
         else:
             raise ValueError("Received invalid action={} which is not part of the action space".format(action))
         
-        collision = mipEnv.collision_test(self, box_pos_x, box_pos_y)
+        collision = mipEnv.collision_test(self, box_pos_x, box_pos_y, h, w)
         
         # if there is a collision, take the last position
         if collision is True:
@@ -756,12 +836,9 @@ class mipEnv(gym.Env):
             
         return state, reward, done, info
 
-
-    
     def reset(self):
         return self.observation_space.sample()
-        
-        
+    
     def render(self, mode = 'rgb_array', close = False):
                 
         import pygame as pg
@@ -770,28 +847,53 @@ class mipEnv(gym.Env):
         n = self.n
         box_pos_x = self.box_pos_x 
         box_pos_y = self.box_pos_y
-        box_w = self.box_w
-        box_h = self.box_h
-        grid_size_x = self.grid_size_x
-        grid_size_y = self.grid_size_y
+        #box_w = self.box_w
+        #box_h = self.box_h
+        w = self.w
+        h = self.h
+        #grid_size_x = self.grid_size_x
+        #grid_size_y = self.grid_size_y
+        W = self.W
+        H = self.H
+        
+        
+        
+        # round to integer
+        w = w.astype(int)
+        h = h.astype(int)
+        
+        '''
+        for i in range(0, n):
+            w[i] = int(w[i])
+            h[i] = int(h[i])
+        '''
 
-        grid = np.zeros((grid_size_x, grid_size_y))
+        grid = np.zeros((W, H))
+        
+
         
         #box_pos_x = [37, 5, 35]
         #box_pos_y = [49, 5, 61]
         
         for i in range (0, n):
-            box = np.zeros((box_w[i], box_h[i]))
+            box = np.zeros((w[i], h[i]))
             box.fill(i+1)
-            grid[(box_pos_x[i]):(box_pos_x[i]+box_w[i]), (box_pos_y[i]):(box_pos_y[i]+box_h[i])] = box
+            grid[(box_pos_x[i]):(box_pos_x[i]+w[i]), (box_pos_y[i]):(box_pos_y[i]+h[i])] = box
         
         
         # color dictionary, represents white, red, green and blue
         color_dict = {
-                0: (255, 255, 255), # white
-                1: (255, 0, 0),     # red
-                2: (0, 255, 0),     # green
-                3: (0, 0, 255)      # blue
+                0: (255, 255, 255),     # white
+                1: (255, 000, 000),     # red
+                2: (000, 255, 000),     # green
+                3: (000, 000, 255),     # blue
+                4: (255, 153, 51),     # orange
+                5: (255, 215, 144),     # yellow
+                6: (148, 000, 211),     # purple
+                7: (255, 105, 180),     # pink
+                8: (160, 82, 45),       # brown
+                9: (139, 137, 137),     # grey
+                10:(000, 000, 000)      # black
                 } 
         
         
@@ -801,7 +903,7 @@ class mipEnv(gym.Env):
         
             #scale = 1  # Scale size of pixels for displayability
             #img_h, img_w = (grid_size_x * scale), (grid_size_y * scale) #Größe des Bildes – sollte der verfügbaren Hallenfläche entsprechen
-            img_h, img_w = (grid_size_x * 1), (grid_size_y * 1)
+            img_h, img_w = (W * 1), (H * 1)
             grid_img = np.zeros((img_h, img_w, 3), dtype=np.uint8) #Leeres Array
             
             '''
@@ -814,19 +916,44 @@ class mipEnv(gym.Env):
             B = np.array((sinks-np.min(sinks))/(np.max(sinks)-np.min(sinks))*255).astype(int)
             '''            
     
+            if n <= 10:
+                for i in range(grid.shape[0]):
+                    for j in range(grid.shape[1]):
+                        if grid[i][j] == 0:
+                            grid_img[i][j] = color_dict[0] #fill all expty room white
+                        else:
+                            grid_img[i][j] = color_dict[grid[i][j]] #fill all boxes by different colors
+            else:
+                for i in range(grid.shape[0]):
+                    for j in range(grid.shape[1]):
+                        if grid[i][j] == 0:
+                            grid_img[i][j] = color_dict[0] #fill all expty room white
+                        else:
+                            grid_img[i][j] = color_dict[10] #fill all boxes black
+                            
+                            
+            '''
             for i in range(grid.shape[0]):
                 for j in range(grid.shape[1]):
-                    #cells[i][j] = color_dict[random.randrange(3)]
                     if grid[i][j] == 1:
                         grid_img[i][j] = color_dict[1]
                     elif grid[i][j] == 2:
                         grid_img[i][j] = color_dict[2]
                     elif grid[i][j] == 3:
                         grid_img[i][j] = color_dict[3]
+                    elif grid[i][j] == 4:
+                        grid_img[i][j] = color_dict[4]
+                    elif grid[i][j] == 5:
+                        grid_img[i][j] = color_dict[5]
+                    elif grid[i][j] == 6:
+                        grid_img[i][j] = color_dict[6]
                     else:
                         grid_img[i][j] = color_dict[0]
+            '''
+            
                         
             grid_img = np.transpose(grid_img,(1,0,2))
+            
             '''
             img = Image.fromarray(grid_img, 'RGB')            
             plt.imshow(img)
@@ -846,11 +973,20 @@ class mipEnv(gym.Env):
         
         if mode == 'human':
             # create a 3D array with XxYx3 (the last dimension is for the RGB color)
-            cells = np.ndarray((grid_size_x , grid_size_y, 3))
+            cells = np.ndarray((W , H, 3))
             
             for i in range(grid.shape[0]):
                 for j in range(grid.shape[1]):
                     #cells[i][j] = color_dict[random.randrange(3)]
+                    for x in range(1, i+1):
+                        if grid[i][j] == x:
+                            if n <= 10:
+                                cells[i][j] = color_dict[x]
+                            else:
+                                cells[i][j] = color_dict[10]
+                        else:
+                            cells[i][j] = color_dict[0]
+                    '''
                     if grid[i][j] == 1:
                         cells[i][j] = color_dict[1]
                     elif grid[i][j] == 2:
@@ -859,7 +995,7 @@ class mipEnv(gym.Env):
                         cells[i][j] = color_dict[3]
                     else:
                         cells[i][j] = color_dict[0]
-                    
+                    '''
                     
             # set the size of the screen as multiples of the array
             cellsize = 10
@@ -895,7 +1031,6 @@ class mipEnv(gym.Env):
                         
             pg.quit()
             
-
 
     def close(self):
         pass
