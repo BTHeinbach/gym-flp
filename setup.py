@@ -9,4 +9,6 @@ setup(name='gym_flp',
       license='MIT',
       install_requires=['gym', 'numpy'],
       packages=find_packages(),
-      include_package_data=True)
+      package_data = {
+        # If any package contains *.txt or *.rst files, include them:
+        '': ['*.txt', '*.dat', '*.sln', '*.prn', '*.pkl'],})
