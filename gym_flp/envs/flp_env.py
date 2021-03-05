@@ -32,7 +32,7 @@ class qapEnv(gym.Env):
 
     def __init__(self, mode=None, instance=None):
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-        self.DistanceMatrices, self.FlowMatrices = pickle.load(open(os.path.join(__location__,'qap_matrices.pkl'), 'rb'))
+        self.DistanceMatrices, self.FlowMatrices = pickle.load(open(os.path.join(__location__,'discrete', 'qap_matrices.pkl'), 'rb'))
         self.transport_intensity = None
         self.instance = instance
         self.mode = mode
@@ -175,7 +175,7 @@ class fbsEnv(gym.Env):
     
     def __init__(self, mode=None, instance = None):
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,'cont_instances.pkl'), 'rb'))
+        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,'continual', 'cont_instances.pkl'), 'rb'))
         self.mode = mode
         
         self.instance = instance
@@ -440,7 +440,7 @@ class ofpEnv(gym.Env):
           
     def __init__(self, mode = None, instance = None, distance = None, aspect_ratio = None, step_size = None, greenfield = None):
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,'cont_instances.pkl'), 'rb'))
+        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,'continual', 'cont_instances.pkl'), 'rb'))
         self.mode = mode
         self.aspect_ratio = 2 if aspect_ratio is None else aspect_ratio
         self.step_size = 2 if step_size is None else step_size
@@ -746,7 +746,7 @@ class stsEnv(gym.Env):
           
     def __init__(self, mode = None, instance = None):
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,'cont_instances.pkl'), 'rb'))
+        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,'continual', 'cont_instances.pkl'), 'rb'))
         self.instance = instance
         self.mode = mode
         self.MHC = rewards.mhc.MHC() 
