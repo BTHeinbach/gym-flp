@@ -3,8 +3,7 @@ import numpy as np
 class MHC():
 
     def __init__(self, shape=None, dtype=np.float32):
-        print('Hi, I compute the layout cost.')
-
+        self.shape = shape
         
     def compute(self, D, F, s):
         # Compute reward for taking action on old state:  
