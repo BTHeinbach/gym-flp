@@ -7,7 +7,7 @@ setup(name='gym_flp',
       author='Benjamin Heinbach',
       author_email='benjamin.heinbach@uni-siegen.de',
       license='MIT',
-      install_requires=['gym', 'numpy'],
+      install_requires=['gym', 'numpy', 'anytree', 'pygame'],
       packages=find_packages(),
       package_data = {
         # If any package contains *.txt or *.rst files, include them:
