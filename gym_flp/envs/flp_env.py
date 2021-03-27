@@ -612,7 +612,7 @@ class ofpEnv(gym.Env):
 
         for i in range (0, self.n-1):
             for j in range (i+1,self.n):                
-                if x[i]+0.5*l[i] < x[j]-0.5*l[j] or x[i]-0.5*l[i] > x[j]+0.5*l[j] or y[i]-0.5*w[i] < y[j]+0.5*w[j] or y[i]+0.5*w[i] < y[j]+0.5*w[j]:
+                if x[i]+0.5*l[i] < x[j]-0.5*l[j] or x[i]-0.5*l[i] > x[j]+0.5*l[j] or y[i]-0.5*w[i] > y[j]+0.5*w[j] or y[i]+0.5*w[i] < y[j]-0.5*w[j]:
                     collision = True
                     break
                           
