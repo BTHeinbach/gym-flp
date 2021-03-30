@@ -5,7 +5,7 @@ class MHC():
     def __init__(self, shape=None, dtype=np.float32):
         self.shape = shape
         
-    def compute(self, D, F, s):
+    def _compute(self, D, F, s):
         # Compute reward for taking action on old state:  
         # Calculate permutation matrix for new state
         P = self.permutationMatrix(s)
@@ -16,6 +16,20 @@ class MHC():
         MHC = 0.5*np.trace(transport_intensity)
                 
         return MHC, transport_intensity
+     
+    def compute(self, D, F, s):       
+        T = np.zeros((len(s),len(s)))
+
+        for i in range(len(s)):
+            for j in range(len(s)):
+                if j > i:
+                    d = D[i][j]
+                    f = F[s[i]-1][s[j]-1]
+                    T[i][j] = d*f
+                else:
+                    T[i][j] = 0 
+
+        return np.sum(T), T
     
     def permutationMatrix(self, a):
         P = np.zeros((len(a), len(a)))
