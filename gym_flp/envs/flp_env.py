@@ -8,7 +8,6 @@ import math
 import matplotlib.pyplot as plt
 from PIL import Image
 from gym_flp import rewards
-import pygame as pg
 from IPython.display import display, clear_output
 import anytree
 from anytree import Node, RenderTree, PreOrderIter, LevelOrderIter, LevelOrderGroupIter
@@ -65,6 +64,7 @@ class qapEnv(gym.Env):
         # Initialize Environment with empty state and action
         self.action = None
         self.state = None
+        self.internal_state = None
         
         #Initialize moving target to incredibly high value. To be updated if reward obtained is smaller. 
         
@@ -74,51 +74,23 @@ class qapEnv(gym.Env):
     def reset(self):
         state = default_rng().choice(range(1,self.n+1), size=self.n, replace=False) 
 
-        MHC, self.TM = self.MHC.compute(self.D, self.F, state)
-        
-        if self.mode == "human":
-            state = np.array(state)
-        
-        elif self.mode == "rgb_array":
-            rgb = np.zeros((1,self.n,3), dtype=np.uint8)
-            
-            sources = np.sum(self.TM, axis = 1)
-            sinks = np.sum(self.TM, axis = 0)
-            
-            R = np.array((state-np.min(state))/(np.max(state)-np.min(state))*255).astype(int)
-            G = np.array((sources-np.min(sources))/(np.max(sources)-np.min(sources))*255).astype(int)
-            B = np.array((sinks-np.min(sinks))/(np.max(sinks)-np.min(sinks))*255).astype(int)
-                        
-            for i, s in enumerate(state):
-                rgb[0, i] = [R[s-1], G[s-1], B[s-1]]
-
-            state = np.array(rgb)
-            
-        return state[:]
+        #MHC, self.TM = self.MHC.compute(self.D, self.F, state)
+        self.internal_state = state.copy()
+        return state
     
     def step(self, action):
         # Create new State based on action 
         
+        fromState = self.internal_state.copy()
+        
         swap = self.actions[action]
+        fromState[swap[0]-1], fromState[swap[1]-1] = fromState[swap[1]-1], fromState[swap[0]-1]
         
-        fromState = np.array(self.state)
         
-        if self.mode == 'human':
-            fromState[swap[0]-1], fromState[swap[1]-1] = fromState[swap[1]-1], fromState[swap[0]-1]
-            current_permutation = np.array(fromState)
-            
-        elif self.mode == 'rgb_array':
-            
-            temp1 = np.array(fromState[0,swap[0]-1])
-            temp2 =  np.array(fromState[0,swap[1]-1])
-            
-            fromState[0,swap[0]-1] = temp2
-            fromState[0,swap[1]-1] = temp1
-
-            rescale = fromState[:,:,0]/255*5 +1
-            current_permutation = rescale[0]
-        
-        MHC, self.TM = self.MHC.compute(self.D, self.F, current_permutation)   
+        newState = fromState.copy()
+    
+        #MHC, self.TM = self.MHC.compute(self.D, self.F, current_permutation) 
+        MHC, self.TM = self.MHC.compute(self.D, self.F, newState)
         
         if self.mode == 'human':
             self.states[tuple(fromState)] = MHC
@@ -129,26 +101,43 @@ class qapEnv(gym.Env):
         #reward = self.movingTargetReward - MHC
         reward = -1 if MHC > self.movingTargetReward else 10
         self.movingTargetReward = MHC if MHC < self.movingTargetReward else self.movingTargetReward
-
-        newState = np.array(fromState)
         
-        return newState, MHC, False, {}
-          
+        if self.mode == "rgb_array":
+            rgb = np.zeros((1,self.n,3), dtype=np.uint8)
+            
+            sources = np.sum(self.TM, axis = 1)
+            sinks = np.sum(self.TM, axis = 0)
+            
+            R = np.array((fromState-np.min(fromState))/(np.max(fromState)-np.min(fromState))*255).astype(int)
+            G = np.array((sources-np.min(sources))/(np.max(sources)-np.min(sources))*255).astype(int)
+            B = np.array((sinks-np.min(sinks))/(np.max(sinks)-np.min(sinks))*255).astype(int)
+                        
+            for i, s in enumerate(fromState):
+                rgb[0:1, i] = [R[s-1], G[s-1], B[s-1]]
+
+            
+            newState = np.array(rgb)
+            self.state = newState.copy()
+            
+        self.internal_state = fromState.copy()
+        
+        return newState, rewards, False, {}
+    
     def render(self, mode=None):
         if self.mode == "human":
                 
             SCALE = 1  # Scale size of pixels for displayability
-            img_h, img_w = SCALE, (len(self.state))*SCALE
+            img_h, img_w = SCALE, (len(self.internal_state))*SCALE
             data = np.zeros((img_h, img_w, 3), dtype=np.uint8)
             
             sources = np.sum(self.TM, axis = 1)
             sinks = np.sum(self.TM, axis = 0)
             
-            R = np.array((self.state-np.min(self.state))/(np.max(self.state)-np.min(self.state))*255).astype(int)
+            R = np.array((self.internal_state-np.min(self.internal_state))/(np.max(self.internal_state)-np.min(self.internal_state))*255).astype(int)
             G = np.array((sources-np.min(sources))/(np.max(sources)-np.min(sources))*255).astype(int)
             B = np.array((sinks-np.min(sinks))/(np.max(sinks)-np.min(sinks))*255).astype(int)
             
-            for i, s in enumerate(self.state):
+            for i, s in enumerate(self.internal_state):
                 data[0*SCALE:1*SCALE, i*SCALE:(i+1)*SCALE] = [R[s-1], G[s-1], B[s-1]]
                        
             img = Image.fromarray(data, 'RGB')            
@@ -168,8 +157,8 @@ class qapEnv(gym.Env):
     def pairwiseExchange(self, x):
         actions = [(i,j) for i in range(1,x) for j in range(i+1,x+1) if not i==j]
         actions.append((1,1))
-        return actions
-                
+        return actions      
+    
 class fbsEnv(gym.Env):
     metadata = {'render.modes': ['rgb_array', 'human']}          
     
