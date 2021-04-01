@@ -121,7 +121,7 @@ class qapEnv(gym.Env):
             
         self.internal_state = fromState.copy()
         
-        return newState, rewards, False, {}
+        return newState, reward, False, {}
     
     def render(self, mode=None):
         if self.mode == "human":
