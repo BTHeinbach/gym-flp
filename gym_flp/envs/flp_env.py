@@ -552,8 +552,24 @@ class ofpEnv(gym.Env):
         self.left_bound = 0 + max(self.l)/2
         self.right_bound = self.L - max(self.l)/2
     
-    def offGrid(self):
-        ...
+    def offGrid(self, s):
+        if np.any(s[0::4]-s[2::4] < 0):
+            print("Bottom bound breached")
+            og = True
+        elif np.any(s[0::4]+s[2::4] > self.W):
+            print("Top bound breached")
+            og = True
+        
+        elif np.any(s[1::4]-s[3::4] < 0):
+            print("left bound breached")
+            og = True
+            
+        elif np.any(s[0::4]+s[2::4] > self.L):
+            print("right bound breached")
+            og = True
+        else:
+            of = False
+        return og
             
     def reset(self):
         # Start with random x and y positions
@@ -601,7 +617,7 @@ class ofpEnv(gym.Env):
 
         for i in range (0, self.n-1):
             for j in range (i+1,self.n):                
-                if x[i]+0.5*l[i] < x[j]-0.5*l[j] or x[i]-0.5*l[i] > x[j]+0.5*l[j] or y[i]-0.5*w[i] > y[j]+0.5*w[j] or y[i]+0.5*w[i] < y[j]-0.5*w[j]:
+                if not(x[i]+0.5*l[i] < x[j]-0.5*l[j] or x[i]-0.5*l[i] > x[j]+0.5*l[j] or y[i]-0.5*w[i] > y[j]+0.5*w[j] or y[i]+0.5*w[i] < y[j]-0.5*w[j]):
                     collision = True
                     break
                           
@@ -665,14 +681,16 @@ class ofpEnv(gym.Env):
         
         # Test if initial state causing a collision. If yes than initialize a new state until there is no collision
         collision = self.collision_test(temp_state[0::4],temp_state[1::4], temp_state[2::4], temp_state[3::4]) # Pass every 4th item starting at 0 (x pos) and 1 (y pos) for checking         
-        print(collision)
+        out_of_bounds = self.offGrid(temp_state)
         
-        #reward = -1000 if collision else -reward 
+        penalty -= 1000 if collision else penalty
+        
+        penalty -= 1000 if out_of_bounds else penalty
         
         if self.mode == 'rgb_array':
             self.state = self.ConvertCoordinatesToState(self.internal_state) #Retain state for internal use
             
-        return self.state, -reward, False, {}
+        return self.state, -reward + penalty, False, {}
     
     def ConvertCoordinatesToState(self, state_prelim):    
         data = np.zeros((self.observation_space.shape)) if self.mode == 'rgb_array' else np.zeros((self.W, self.L, 3),dtype=np.uint8)
