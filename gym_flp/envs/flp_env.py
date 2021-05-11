@@ -442,6 +442,10 @@ class ofpEnv(gym.Env):
         self.F = self.FlowMatrices[self.instance]
         self.n = self.problems[self.instance]
         self.AreaData = self.sizes[self.instance]
+        self.counter = 0
+        
+        self.pseudo_stability = 100 #If the reward has not improved in the last 200 steps, terminate the episode
+        self.best_reward = None
         
         
         # Obtain size data: FBS needs a length and area
@@ -486,8 +490,8 @@ class ofpEnv(gym.Env):
             
         # These values need to be set manually, e.g. acc. to data from literature. Following Eq. 1 in Ulutas & Kulturel-Konak (2012), the minimum side length can be determined by assuming the smallest facility will occupy alone. 
         self.aspect_ratio = int(max(self.beta)) if not self.beta is None else self.aspect_ratio
-        self.min_length = np.min(self.a) / self.L
-        self.min_width = np.min(self.a) / self.W
+        self.min_length = 1
+        self.min_width = 1
 
         # 3. Define  the possible actions: 5 for each box [toDo: plus 2 to manipulate sizes] + 1 idle action for all
         self.actions = {}   
@@ -530,17 +534,17 @@ class ofpEnv(gym.Env):
             observation_low = np.zeros(4* self.n)
             observation_high = np.zeros(4* self.n)
             
-            observation_low[0::4] = 0 + self.l / 2
-            observation_low[1::4] = 0 + self.w / 2
+            observation_low[0::4] = 0
+            observation_low[1::4] = 0
             observation_low[2::4] = self.min_length
             observation_low[3::4] = self.min_width
             
-            observation_high[0::4] = self.L - self.l / 2
-            observation_high[1::4] = self.W - self.w / 2
+            observation_high[0::4] = self.L
+            observation_high[1::4] = self.W
             observation_high[2::4] = max(self.l)
             observation_high[3::4] = max(self.w)
             
-            self.observation_space = spaces.Box(low=observation_low, high=observation_high, dtype = float) # Vector representation of coordinates
+            self.observation_space = spaces.Box(low=observation_low, high=observation_high, dtype = np.uint8) # Vector representation of coordinates
         else:
             print("Nothing correct selected")
         
@@ -552,25 +556,6 @@ class ofpEnv(gym.Env):
         self.left_bound = 0 + max(self.l)/2
         self.right_bound = self.L - max(self.l)/2
     
-    def offGrid(self, s):
-        if np.any(s[0::4]-s[2::4] < 0):
-            print("Bottom bound breached")
-            og = True
-        elif np.any(s[0::4]+s[2::4] > self.W):
-            print("Top bound breached")
-            og = True
-        
-        elif np.any(s[1::4]-s[3::4] < 0):
-            print("left bound breached")
-            og = True
-            
-        elif np.any(s[0::4]+s[2::4] > self.L):
-            print("right bound breached")
-            og = True
-        else:
-            of = False
-        return og
-            
     def reset(self):
         # Start with random x and y positions
          
@@ -600,15 +585,38 @@ class ofpEnv(gym.Env):
             s[2::4] = self.w
             s[3::4] = self.l
             
-            self.internal_state = np.array(s)
+            self.internal_state = np.array(s).copy()
             #self.state = self.constructState(y, x, self.w, self.l, self.n)
            
+
             
             self.D = getDistances(s[0::4], s[1::4])
             reward, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))
-            self.state = self.ConvertCoordinatesToState(self.internal_state)
             
-        return self.state[:]
+            self.state = self.ConvertCoordinatesToState(self.internal_state)
+        self.counter = 0
+        self.best_reward = -reward    
+            
+        return self.state.copy()
+
+    def offGrid(self, s):
+        if np.any(s[0::4]-s[2::4] < 0):
+            #print("Bottom bound breached")
+            og = True
+        elif np.any(s[0::4]+s[2::4] > self.W):
+            #print("Top bound breached")
+            og = True
+        
+        elif np.any(s[1::4]-s[3::4] < 0):
+            #print("left bound breached")
+            og = True
+            
+        elif np.any(s[1::4]+s[3::4] > self.L):
+            #print("right bound breached")
+            og = True
+        else:
+            og = False
+        return og    
 
     def collision_test(self, y, x, w, l):      
 
@@ -629,7 +637,7 @@ class ofpEnv(gym.Env):
         # Get copy of state to manipulate:
         temp_state = self.internal_state[:]
         
-        
+        penalty = 0
         step_size = self.step_size
         
         # Do the action 
@@ -638,28 +646,28 @@ class ofpEnv(gym.Env):
                 temp_state[4*(m-1)+1] += step_size
             else:
                 temp_state[4*(m-1)+1] += 0
-                print('Forbidden action: machine', m, 'left grid on upper bound')
+                #print('Forbidden action: machine', m, 'left grid on upper bound')
 
         elif self.actions[action] == "down":
             if temp_state[4*(m-1)+1] > self.lower_bound:
-                temp_state[4*(m-1)+1] += step_size
+                temp_state[4*(m-1)+1] -= step_size
             else:
                 temp_state[4*(m-1)+1] += 0
-                print('Forbidden action: machine', m, 'left grid on lower bound')
+                #print('Forbidden action: machine', m, 'left grid on lower bound')
             
         elif self.actions[action] == "right":
             if temp_state[4*(m-1)] < self.right_bound:
                 temp_state[4*(m-1)] += step_size
             else:
                 temp_state[4*(m-1)] += 0
-                print('Forbidden action: machine', m, 'left grid on right bound')
+                #print('Forbidden action: machine', m, 'left grid on right bound')
             
         elif self.actions[action] == "left":
             if temp_state[4*(m-1)] > self.left_bound:
                 temp_state[4*(m-1)] -= step_size
             else:
                 temp_state[4*(m-1)] += 0
-                print('Forbidden action: machine', m, 'left grid on left bound')
+                #print('Forbidden action: machine', m, 'left grid on left bound')
             
         elif self.actions[action] == "keep":
             None #Leave everything as is
@@ -687,10 +695,19 @@ class ofpEnv(gym.Env):
         
         penalty -= 1000 if out_of_bounds else penalty
         
+        if (-reward + penalty) > self.best_reward:
+            self.best_reward = -reward + penalty
+        else:
+            self.counter += 1
+            #print(self.counter)
+        
         if self.mode == 'rgb_array':
             self.state = self.ConvertCoordinatesToState(self.internal_state) #Retain state for internal use
+        
+        done = True if self.counter >= self.pseudo_stability else False 
             
-        return self.state, -reward + penalty, False, {}
+        
+        return self.state, -reward + penalty, done, {}
     
     def ConvertCoordinatesToState(self, state_prelim):    
         data = np.zeros((self.observation_space.shape)) if self.mode == 'rgb_array' else np.zeros((self.W, self.L, 3),dtype=np.uint8)
@@ -744,7 +761,7 @@ class ofpEnv(gym.Env):
         return img
         
     def close(self):
-        self.close()
+        pass #Nothing here yet
         
 
 class stsEnv(gym.Env):
