@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 
 setup(name='gym_flp',
-      version='0.1.1',
+      version='0.1.2',
       description='Implementation of facility layout problems in OpenAI Gym',
       url='https://github.com/BTHeinbach/gym-flp',
       author='Benjamin Heinbach',
