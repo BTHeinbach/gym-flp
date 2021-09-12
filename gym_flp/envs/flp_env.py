@@ -444,7 +444,7 @@ class ofpEnv(gym.Env):
         self.AreaData = self.sizes[self.instance]
         self.counter = 0
         
-        self.pseudo_stability = 100 #If the reward has not improved in the last 200 steps, terminate the episode
+        self.pseudo_stability = 0 #If the reward has not improved in the last 200 steps, terminate the episode
         self.best_reward = None
         
         
@@ -481,8 +481,8 @@ class ofpEnv(gym.Env):
             self.W = self.L 
         
         if self.greenfield:
-            self.L = 5*self.L
-            self.W = 5*self.W
+            self.L = 2*self.L
+            self.W = 2*self.W
             
             # Design a layout with l = 1,5 * w
             #self.L = divisor(int(self.A))
@@ -534,15 +534,15 @@ class ofpEnv(gym.Env):
             observation_low = np.zeros(4* self.n)
             observation_high = np.zeros(4* self.n)
             
-            observation_low[0::4] = 0
-            observation_low[1::4] = 0
-            observation_low[2::4] = self.min_length
-            observation_low[3::4] = self.min_width
+            observation_low[0::4] = max(self.w)
+            observation_low[1::4] = max(self.l)
+            observation_low[2::4] = max(self.w)
+            observation_low[3::4] = max(self.l)
             
-            observation_high[0::4] = self.L
-            observation_high[1::4] = self.W
-            observation_high[2::4] = max(self.l)
-            observation_high[3::4] = max(self.w)
+            observation_high[0::4] = self.W - max(self.w)
+            observation_high[1::4] = self.L - max(self.l)
+            observation_high[2::4] = self.W - max(self.w)
+            observation_high[3::4] = self.L - max(self.l) 
             
             self.observation_space = spaces.Box(low=observation_low, high=observation_high, dtype = np.uint8) # Vector representation of coordinates
         else:
@@ -551,10 +551,10 @@ class ofpEnv(gym.Env):
         self.MHC = rewards.mhc.MHC() 
         
         # Set Boundaries
-        self.upper_bound = self.W - max(self.w) / 2
-        self.lower_bound = 0 + max(self.w) / 2
-        self.left_bound = 0 + max(self.l)/2
-        self.right_bound = self.L - max(self.l)/2
+        self.upper_bound = self.L- max(self.l)/2
+        self.lower_bound =  0 + max(self.l)/2
+        self.left_bound =  0 + max(self.w)/2
+        self.right_bound = self.W- max(self.w)/2
     
     def reset(self):
         # Start with random x and y positions
@@ -570,7 +570,9 @@ class ofpEnv(gym.Env):
             self.internal_state = np.array(state_prelim)
             self.state = np.array(state_prelim)
             reward, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))
-        
+            self.counter = 0 
+            self.best_reward = mhc
+            self.reward = 0
             
         elif self.mode == 'rgb_array':
             state_prelim = np.zeros((self.W, self.L, 3),dtype=np.uint8)
@@ -595,75 +597,86 @@ class ofpEnv(gym.Env):
             
             self.state = self.ConvertCoordinatesToState(self.internal_state)
         self.counter = 0
-        self.best_reward = -reward    
+        self.best_reward = reward    
             
         return self.state.copy()
 
-    def offGrid(self, s):
-        if np.any(s[0::4]-s[2::4] < 0):
-            #print("Bottom bound breached")
-            og = True
-        elif np.any(s[0::4]+s[2::4] > self.W):
-            #print("Top bound breached")
-            og = True
+#     def offGrid(self, s):
+#         if np.any(s[0::4]-s[2::4] < 0):
+#             #print("Bottom bound breached")
+#             og = True
+#         elif np.any(s[0::4]+s[2::4] > self.W):
+#             #print("Top bound breached")
+#             og = True
         
-        elif np.any(s[1::4]-s[3::4] < 0):
-            #print("left bound breached")
-            og = True
+#         elif np.any(s[1::4]-s[3::4] < 0):
+#             #print("left bound breached")
+#             og = True
             
-        elif np.any(s[1::4]+s[3::4] > self.L):
-            #print("right bound breached")
-            og = True
-        else:
-            og = False
-        return og    
+#         elif np.any(s[1::4]+s[3::4] > self.L):
+#             #print("right bound breached")
+#             og = True
+#         else:
+#             og = False
+#         return og    
 
-    def collision_test(self, y, x, w, l):      
+#     def collision_test(self, y, x, w, l):      
 
-        # collision test
-        collision = False #initialize collision for each collision test
+#         # collision test
+#         collision = False #initialize collision for each collision test
 
-        for i in range (0, self.n-1):
-            for j in range (i+1,self.n):                
-                if not(x[i]+0.5*l[i] < x[j]-0.5*l[j] or x[i]-0.5*l[i] > x[j]+0.5*l[j] or y[i]-0.5*w[i] > y[j]+0.5*w[j] or y[i]+0.5*w[i] < y[j]-0.5*w[j]):
-                    collision = True
-                    break
+#         for i in range (0, self.n-1):
+#             for j in range (i+1,self.n):                
+#                 if not(x[i]+0.5*l[i] < x[j]-0.5*l[j] or x[i]-0.5*l[i] > x[j]+0.5*l[j] or y[i]-0.5*w[i] > y[j]+0.5*w[j] or y[i]+0.5*w[i] < y[j]-0.5*w[j]):
+#                     collision = True
+#                     break
                           
+#         return collision
+    def collision(self,x,y,w,l):
+        collision = False
+        for i in range(0,self.n-1):
+            for j in range(i+1,self.n):
+                if (abs(int(x[i]) - int(x[j])) < 0.5*self.w[i]+0.5*self.w[j]):
+                    if(abs(int(y[i]) - int(y[j])) < 0.5*self.l[i]+0.5*self.l[j]):
+                        #print(x[i],y[i],x[j],y[j])
+                        collision = True
+                if (abs(int(y[i]) - int(y[j])) < 0.5*self.l[i]+0.5*self.l[j]):
+                    if(abs(int(x[i]) - int(x[j])) < 0.5*self.w[i]+0.5*self.w[j]):
+                        #print(x[i],y[i],x[j],y[j])
+                        collision = True
         return collision
 
     def step(self, action):        
         m = np.int(np.ceil((action+1)/5))   # Facility on which the action is
-               
+        self.reward = 0      
         # Get copy of state to manipulate:
         temp_state = self.internal_state[:]
-        
-        penalty = 0
         step_size = self.step_size
         
         # Do the action 
         if self.actions[action] == "up":          
-            if temp_state[4*(m-1)+1] < self.upper_bound:
+            if temp_state[4*(m-1)+1] + temp_state[4*(m-1)+3]*0.5 + step_size < self.upper_bound:
                 temp_state[4*(m-1)+1] += step_size
             else:
                 temp_state[4*(m-1)+1] += 0
                 #print('Forbidden action: machine', m, 'left grid on upper bound')
 
         elif self.actions[action] == "down":
-            if temp_state[4*(m-1)+1] > self.lower_bound:
+            if temp_state[4*(m-1)+1] - temp_state[4*(m-1)+3]*0.5 + step_size  > self.lower_bound:
                 temp_state[4*(m-1)+1] -= step_size
             else:
                 temp_state[4*(m-1)+1] += 0
                 #print('Forbidden action: machine', m, 'left grid on lower bound')
             
         elif self.actions[action] == "right":
-            if temp_state[4*(m-1)] < self.right_bound:
+            if temp_state[4*(m-1)]+temp_state[4*(m-1)+2]*0.5 + step_size  < self.right_bound:
                 temp_state[4*(m-1)] += step_size
             else:
                 temp_state[4*(m-1)] += 0
                 #print('Forbidden action: machine', m, 'left grid on right bound')
             
         elif self.actions[action] == "left":
-            if temp_state[4*(m-1)] > self.left_bound:
+            if temp_state[4*(m-1)]-temp_state[4*(m-1)+2]*0.5 + step_size > self.left_bound:
                 temp_state[4*(m-1)] -= step_size
             else:
                 temp_state[4*(m-1)] += 0
@@ -689,37 +702,31 @@ class ofpEnv(gym.Env):
         
         # Test if initial state causing a collision. If yes than initialize a new state until there is no collision
         collision = self.collision_test(temp_state[0::4],temp_state[1::4], temp_state[2::4], temp_state[3::4]) # Pass every 4th item starting at 0 (x pos) and 1 (y pos) for checking         
-        out_of_bounds = self.offGrid(temp_state)
-        
-        penalty -= 1000 if collision else penalty
-        
-        penalty -= 1000 if out_of_bounds else penalty
-        
-        if (-reward + penalty) > self.best_reward:
-            self.best_reward = -reward + penalty
-        else:
-            self.counter += 1
-            #print(self.counter)
-        
+        if (MHC < self.best_reward) and (collision == False) :
+            self.best_reward = MHC
+            self.reward = 50
+        if collision == True:
+            self.reward = -2
         if self.mode == 'rgb_array':
             self.state = self.ConvertCoordinatesToState(self.internal_state) #Retain state for internal use
-        
-        done = True if self.counter >= self.pseudo_stability else False 
-            
-        
-        return self.state, -reward + penalty, done, {}
+        self.pseudo_stability = self.counter
+        self.done = True if self.pseudo_stability == 200 else False
+        self.counter += 1
+        #print(self.reward)
+        return self.state,self.reward,self.done,{}        
     
     def ConvertCoordinatesToState(self, state_prelim):    
-        data = np.zeros((self.observation_space.shape)) if self.mode == 'rgb_array' else np.zeros((self.W, self.L, 3),dtype=np.uint8)
-        
+        data = np.zeros((self.observation_space.shape)) if self.mode == 'rgb_array' else np.zeros((self.W, self.L, 3),dtype=np.uint8)   
         sources = np.sum(self.TM, axis = 1)
         sinks = np.sum(self.TM, axis = 0)
         
         p = np.arange(self.n)
         R = np.array((p-np.min(p))/(np.max(p)-np.min(p))*255).astype(int)
+        R[R<=20] = 255
         G = np.array((sources-np.min(sources))/(np.max(sources)-np.min(sources))*255).astype(int)
+        G[G<=20] = 255
         B = np.array((sinks-np.min(sinks))/(np.max(sinks)-np.min(sinks))*255).astype(int)
-        
+        B[B<=20] = 255
         for x, p in enumerate(p):
             x_from = state_prelim[4*x+0] -0.5 * state_prelim[4*x+2]
             y_from = state_prelim[4*x+1] -0.5 * state_prelim[4*x+3]
