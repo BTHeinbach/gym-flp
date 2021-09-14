@@ -514,7 +514,10 @@ class ofpEnv(gym.Env):
         # [facility y, facility x, facility width, facility length] --> [self.fac_y, self.fac_x, self.fac_width_y, self.fac_length_x]
         
         if self.mode == "rgb_array":
-            self.observation_space = spaces.Box(low = 0, high = 255, shape= (self.plant_Y, self.plant_X,3), dtype = np.uint8) # Image representation, channel-last for PyTorch CNNs
+            if self.W or self.L < 36:
+            self.W, self.L = 36, 36
+            
+            self.observation_space = spaces.Box(low = 0, high = 255, shape= (3, self.plant_Y, self.plant_X), dtype = np.uint8) # Image representation, channel-last for PyTorch CNNs
         elif self.mode == "human":
             
             observation_low = np.zeros(4* self.n)
@@ -547,39 +550,35 @@ class ofpEnv(gym.Env):
     def reset(self):
         # Start with random x and y positions
          
-        if self.mode == 'human':
-            state_prelim = self.observation_space.sample()
+        rng = default_rng()
+        state_prelim = self.observation_space.sample() if self.mode == 'human' else np.zeros(4*self.n)
         
-            # Override length (l) and width (w) or facilities with data from instances 
-            state_prelim[2::4] = self.fac_width_y
-            state_prelim[3::4] = self.fac_length_x
+        x = state_prelim[1::4] if self.mode == 'human' else rng.integers(low=0, high=(self.L-max(self.l)), size=(self.n,))
+        y = state_prelim[0::4] if self.mode == 'human' else rng.integers(low=0, high=(self.W-max(self.w)), size=(self.n,))
+        
+        # Override length (l) and width (w) or facilities with data from instances 
+        state_prelim[0::4] = y
+        state_prelim[1::4]= x
+        state_prelim[2::4] = self.w
+        state_prelim[3::4] = self.l
 
-            self.D = getDistances(state_prelim[0::4], state_prelim[1::4])
-            self.internal_state = np.array(state_prelim)
-            self.state = np.array(state_prelim)
-            reward, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))
+        self.D = getDistances(state_prelim[0::4], state_prelim[1::4])
+        mhc, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))
         
-            
-        elif self.mode == 'rgb_array':
-            state_prelim = np.zeros((self.plant_Y, self.plant_X,3),dtype=np.uint8)
-            
-            x = np.random.uniform(0, (self.plant_X-max(self.fac_length_x), size=(self.n,))
-            y = np.random.uniform(0, (self.plant_Y-self.fac_width_y), size=(self.n,))
-     
-            s = np.zeros(4*self.n)
-            s[0::4] = y
-            s[1::4] = x
-            s[2::4] = self.self.fac_width_y
-            s[3::4] = self.fac_length_x
-            
-            self.D = getDistances(s[0::4], s[1::4])
-            reward, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))
-            
-            self.internal_state = np.array(s).copy()
-            self.state = self.ConvertCoordinatesToState(self.internal_state)
+        self.internal_state = np.array(state_prelim)
+        self.state = np.array(state_prelim) if self.mode == 'human' else self.ConvertCoordinatesToState(state_prelim)
         self.counter = 0
-        self.best_reward = reward    
-            
+        self.last_cost = mhc
+        
+        # Ensure a collision-free, feasible starting layout:                         
+        
+        i = 0
+        while self.collision_test(self.internal_state[1::4],self.internal_state[0::4],self.internal_state[3::4],self.internal_state[2::4]) > 0:
+            self.reset()
+            i += 1
+            if i > 10000:
+                break
+           
         return self.state.copy()
 
     def collision_test(self, y, x, w, l):      
@@ -713,8 +712,8 @@ class ofpEnv(gym.Env):
     def render(self):       
         from gym.envs.classic_control import rendering
         if self.viewer is None:
-            self.viewer = rendering.Viewer(self.W, self.L)
-            self.viewer.set_bounds(0, self.W, 0, self.L)
+            self.viewer = rendering.Viewer(self.plant_Y, self.plant_X)
+            self.viewer.set_bounds(0, self.plant_X, 0, self.plant_Y)
             
         
         p = np.arange(self.n)
@@ -1074,14 +1073,8 @@ def getAreaData(df):
     return ar, l, w, a, l_min
 
 def getDistances(x, y):
-    DistanceMatrix = np.zeros((len(x), len(y)))
-    
-    for i, valx in enumerate(x):
-        for j, valy in enumerate(y):
-            DistanceMatrix[i][j] = abs(x[j]-valx)+abs(valy-y[i])
-                           
-    return DistanceMatrix
-
+    return np.array([[abs(float(x[j])-float(valx))+abs(float(valy)-float(y[i])) for (j, valy) in enumerate(y)] for (i, valx) in enumerate(x)],dtype=float)    
+                      
 def divisor(n):
     for i in range(n):
         x = [i for i in range(1,n+1) if not n % i]
