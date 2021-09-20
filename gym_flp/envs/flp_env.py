@@ -582,95 +582,105 @@ class ofpEnv(gym.Env):
         return self.state.copy()
 
     def collision_test(self, y, x, w, l):      
-
+        
         # collision test
-        collision = False #initialize collision for each collision test
-
+        collisions = 0 #initialize collision for each collision test
+       
         for i in range (0, self.n-1):
             for j in range (i+1,self.n):                
-                if not(x[i]+0.5*l[i] < x[j]-0.5*l[j] or x[i]-0.5*l[i] > x[j]+0.5*l[j] or y[i]-0.5*w[i] > y[j]+0.5*w[j] or y[i]+0.5*w[i] < y[j]-0.5*w[j]):
-                    collision = True
+                if not(x[i]+0.5*l[i] < x[j]-0.5*l[j] or 
+                       x[i]-0.5*l[i] > x[j]+0.5*l[j] or 
+                       y[i]-0.5*w[i] > y[j]+0.5*w[j] or 
+                       y[i]+0.5*w[i] < y[j]-0.5*w[j]):
+                    collisions += 1
                     break
-                          
-        return collision
+        return collisions
 
     def step(self, action):        
         m = np.int(np.ceil((action+1)/5))   # Facility on which the action is
-               
-        # Get copy of state to manipulate:
-        temp_state = self.internal_state[:]
+        step_size = self.step_size       
         
-        penalty = 0
-        step_size = self.step_size
+        temp_state = np.array(self.internal_state) # Get copy of state to manipulate:
+        old_state = np.array(self.internal_state)  # Keep copy of state to restore if boundary condition is met       
         
+        penalty = 0 
         # Do the action 
-        if self.actions[action] == "up":          
-            if temp_state[4*(m-1)+1] < self.upper_bound:
-                temp_state[4*(m-1)+1] += step_size
+        if self.action_list[action] == "up": 
+           
+            if (temp_state[4*(m-1)] + temp_state[4*(m-1) + 2]*0.5 + step_size) > self.W:
+                out_of_bounds = True
+                penalty = -1000
+                temp_state = np.array(old_state)
             else:
-                temp_state[4*(m-1)+1] += 0
-                #print('Forbidden action: machine', m, 'left grid on upper bound')
-
-        elif self.actions[action] == "down":
-            if temp_state[4*(m-1)+1] > self.lower_bound:
-                temp_state[4*(m-1)+1] -= step_size
-            else:
-                temp_state[4*(m-1)+1] += 0
-                #print('Forbidden action: machine', m, 'left grid on lower bound')
-            
-        elif self.actions[action] == "right":
-            if temp_state[4*(m-1)] < self.right_bound:
                 temp_state[4*(m-1)] += step_size
+        
+        elif self.action_list[action] == "down": 
+           
+            if (temp_state[4*(m-1)] - temp_state[4*(m-1) + 2]*0.5 - step_size) < 0:
+                out_of_bounds = True
+                penalty = -1000
+                temp_state = np.array(old_state)
             else:
-                temp_state[4*(m-1)] += 0
-                #print('Forbidden action: machine', m, 'left grid on right bound')
-            
-        elif self.actions[action] == "left":
-            if temp_state[4*(m-1)] > self.left_bound:
                 temp_state[4*(m-1)] -= step_size
+        
+        elif self.action_list[action] == "left": 
+           
+            if (temp_state[4*(m-1)+1] - temp_state[4*(m-1) + 3]*0.5 - step_size) < 0:
+                out_of_bounds = True
+                penalty = -1000
+                temp_state = np.array(old_state)
             else:
-                temp_state[4*(m-1)] += 0
-                #print('Forbidden action: machine', m, 'left grid on left bound')
-            
-        elif self.actions[action] == "keep":
+                temp_state[4*(m-1)+1] -= step_size
+                
+        elif self.action_list[action] == "right": 
+           
+            if (temp_state[4*(m-1)+1] + temp_state[4*(m-1) + 3]*0.5 + step_size) > self.L:
+                out_of_bounds = True
+                penalty = -1000
+                temp_state = np.array(old_state)
+            else:
+                temp_state[4*(m-1)+1] += step_size        
+                
+        elif self.action_list[action] == "keep":
             None #Leave everything as is
         
-        elif self.actions[action] == "rotate":
-            temp_state[4*(m-1)+2], temp_state[4*(m-1)+3] = temp_state[4*(m-1)+3], temp_state[4*(m-1)+2]
-            
         else:
             raise ValueError("Received invalid action={} which is not part of the action space".format(action))
         
-        self.fac_x, self.fac_y, self.fac_b, self.fac_h = temp_state[0::4], temp_state[1::4], temp_state[2::4], temp_state[3::4] # ToDo: Read this from self.state
+        
+        self.fac_x, self.fac_y, self.fac_b, self.fac_h = temp_state[1::4], temp_state[0::4], temp_state[3::4], temp_state[2::4] # ToDo: Read this from self.state
         self.D = getDistances(self.fac_x, self.fac_y)
-        
-        fromState = np.array(range(1,self.n+1)) # Need to create permutation matrix 
-        reward, self.TM = self.MHC.compute(self.D, self.F, fromState)   
-        
-        self.internal_state = np.array(temp_state) # Keep a copy of the vector representation for future steps
-        self.state = self.internal_state[:]
+
+        reward, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))   
         
         # Test if initial state causing a collision. If yes than initialize a new state until there is no collision
-        collision = self.collision_test(temp_state[0::4],temp_state[1::4], temp_state[2::4], temp_state[3::4]) # Pass every 4th item starting at 0 (x pos) and 1 (y pos) for checking         
-        out_of_bounds = self.offGrid(temp_state)
+        collisions = self.collision_test(temp_state[0::4],temp_state[1::4], temp_state[2::4], temp_state[3::4]) # Pass every 4th item starting at 0 (x pos) and 1 (y pos) for checking 
+        collision_penalty = -100 * collisions
+               
+        # Make new state for observation
+        self.internal_state = np.array(temp_state) # Keep a copy of the vector representation for future steps
+        self.state = self.ConvertCoordinatesToState(self.internal_state) if self.mode == 'rgb_array' else self.internal_state
         
-        penalty -= 1000 if collision else penalty
+        # Make rewards for observation
+        if mhc < self.best_reward:
+           # print('New lowest mhc:', mhc)
+            self.best_reward = mhc
+            
+            self.counter = 0
+            cost_penalty = 10
         
-        penalty -= 1000 if out_of_bounds else penalty
-        
-        if (-reward + penalty) > self.best_reward:
-            self.best_reward = -reward + penalty
+        elif mhc == self.best_reward:
+            self.counter +=1
+            cost_penalty = 0
         else:
-            self.counter += 1
-            #print(self.counter)
+            self.counter +=1
+            cost_penalty = -1
         
-        if self.mode == 'rgb_array':
-            self.state = self.ConvertCoordinatesToState(self.internal_state) #Retain state for internal use
-        
+        # Check for terminality for observation
         done = True if self.counter >= self.pseudo_stability else False 
             
         
-        return self.state, -reward + penalty, done, {}
+        return self.state, -reward + penalty, done,  {'mhc': mhc}
     
     def ConvertCoordinatesToState(self, state_prelim):    
         data = np.zeros((self.observation_space.shape)) if self.mode == 'rgb_array' else np.zeros((self.W, self.L, 3),dtype=np.uint8)
