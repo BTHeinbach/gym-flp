@@ -11,20 +11,6 @@ from gym_flp import rewards
 from IPython.display import display, clear_output
 import anytree
 from anytree import Node, RenderTree, PreOrderIter, LevelOrderIter, LevelOrderGroupIter
-    
-
-'''
-v0.0.3
-Significant changes:
-    08.09.2020:
-    - Dicrete option removed from spaces; only Box allowed 
-    - Classes for quadtratic set covering and mixed integer programming (-ish) added
-    - Episodic tasks: no more terminal states (exception: max. no. of trials reached)
-    
-    12.10.2020:
-        - mip added
-        - fbs added
-'''
 
 class qapEnv(gym.Env):
     metadata = {'render.modes': ['rgb_array', 'human']}  
@@ -81,13 +67,13 @@ class qapEnv(gym.Env):
     def step(self, action):
         # Create new State based on action 
         
-        fromState = self.internal_state.copy()
+        fromState = np.array(self.internal_state)
         
         swap = self.actions[action]
         fromState[swap[0]-1], fromState[swap[1]-1] = fromState[swap[1]-1], fromState[swap[0]-1]
         
         
-        newState = fromState.copy()
+        newState = np.array(fromState)
     
         #MHC, self.TM = self.MHC.compute(self.D, self.F, current_permutation) 
         MHC, self.TM = self.MHC.compute(self.D, self.F, newState)
@@ -117,11 +103,11 @@ class qapEnv(gym.Env):
 
             
             newState = np.array(rgb)
-            self.state = newState.copy()
-            
-        self.internal_state = fromState.copy()
         
-        return newState, reward, False, {}
+        self.state = np.array(newState) if self.mode == "rgb_array" else np.array(fromState)
+        self.internal_state = np.array(fromState)
+        
+        return self.state, reward, False, {}
     
     def render(self, mode=None):
         if self.mode == "human":
