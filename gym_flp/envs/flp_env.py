@@ -501,7 +501,7 @@ class ofpEnv(gym.Env):
         
         if self.mode == "rgb_array":
             if self.W or self.L < 36:
-            self.W, self.L = 36, 36
+                self.W, self.L = 36, 36
             
             self.observation_space = spaces.Box(low = 0, high = 255, shape= (3, self.plant_Y, self.plant_X), dtype = np.uint8) # Image representation, channel-last for PyTorch CNNs
         elif self.mode == "human":
