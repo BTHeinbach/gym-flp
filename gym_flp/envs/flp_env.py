@@ -22,6 +22,7 @@ class qapEnv(gym.Env):
         self.instance = instance
         self.mode = mode
         
+        
         while not (self.instance in self.DistanceMatrices.keys() or self.instance in self.FlowMatrices.keys() or self.instance in ['Neos-n6', 'Neos-n7', 'Brewery']):
             print('Available Problem Sets:', self.DistanceMatrices.keys())
             self.instance = input('Pick a problem:').strip()
@@ -31,16 +32,16 @@ class qapEnv(gym.Env):
         
         # Determine problem size relevant for much stuff in here:
         self.n = len(self.D[0])
-        
-        # Action space has two option:
-        # 1) Define as Box with shape (1, 2) and allow values to range from 1 through self.n 
-        # 2) Define as Discrete with x = 1+((n^2-n)/2) actions (one half of matrix + 1 value from diagonal) --> Omit "+1" to obtain range from 0 to x!
-        # self.action_space = spaces.Box(low=-1, high=6, shape=(1,2), dtype=np.int) # Doubles complexity of the problem as it allows the identical action (1,2) and (2,1)
+        self.x = math.ceil((math.sqrt(self.n)))
+        self.y = math.ceil((math.sqrt(self.n)))
+        self.size = int(self.x*self.y)
+        self.max_steps = 2*(self.n - 1)
+
         self.action_space = spaces.Discrete(int((self.n**2-self.n)*0.5)+1)
                 
         # If you are using images as input, the input values must be in [0, 255] as the observation is normalized (dividing by 255 to have values in [0, 1]) when using CNN policies.       
         if self.mode == "rgb_array":
-            self.observation_space = spaces.Box(low = 0, high = 255, shape=(1, self.n, 3), dtype = np.uint8) # Image representation
+            self.observation_space = spaces.Box(low = 0, high = 255, shape=(3, 1, self.n), dtype = np.uint8) # Image representation
         elif self.mode == 'human':
             self.observation_space = spaces.Box(low=1, high = self.n, shape=(self.n,), dtype=np.float32)
         
@@ -58,84 +59,55 @@ class qapEnv(gym.Env):
         self.MHC = rewards.mhc.MHC()    # Create an instance of class MHC in module mhc.py from package rewards
     
     def reset(self):
-        state = default_rng().choice(range(1,self.n+1), size=self.n, replace=False) 
-
-        #MHC, self.TM = self.MHC.compute(self.D, self.F, state)
-        self.internal_state = state.copy()
+        self.step_counter = 0  #Zählt die Anzahl an durchgeführten Aktionen
+ 
+        self.internal_state = default_rng().choice(range(1,self.n+1), size=self.n, replace=False) 
+        
+        MHC, self.TM = self.MHC.compute(self.D, self.F, np.array(self.internal_state))
+        self.initial_MHC = MHC
+        self.last_MHC = self.initial_MHC
+                                              
+        state = np.array(self.internal_state) if self.mode == 'human' else np.array(self.get_image())
+        
         return state
     
     def step(self, action):
         # Create new State based on action 
+        self.step_counter += 1 
         
         fromState = np.array(self.internal_state)
         
         swap = self.actions[action]
         fromState[swap[0]-1], fromState[swap[1]-1] = fromState[swap[1]-1], fromState[swap[0]-1]
         
-        
-        newState = np.array(fromState)
-    
-        #MHC, self.TM = self.MHC.compute(self.D, self.F, current_permutation) 
-        MHC, self.TM = self.MHC.compute(self.D, self.F, newState)
-        
-        if self.mode == 'human':
-            self.states[tuple(fromState)] = MHC
-        
+        MHC, self.TM = self.MHC._compute(self.D, self.F, fromState)
+                
         if self.movingTargetReward == np.inf:
-            self.movingTargetReward = MHC 
-     
-        #reward = self.movingTargetReward - MHC
-        reward = -1 if MHC > self.movingTargetReward else 10
-        self.movingTargetReward = MHC if MHC < self.movingTargetReward else self.movingTargetReward
+            self.movingTargetReward = MHC
         
-        if self.mode == "rgb_array":
-            rgb = np.zeros((1,self.n,3), dtype=np.uint8)
+        reward = self.last_MHC - MHC
+        if MHC <= self.movingTargetReward:
+            reward +=10
+            self.movingTargetReward = MHC
+            self.best_state = np.array(fromState)
             
-            sources = np.sum(self.TM, axis = 1)
-            sinks = np.sum(self.TM, axis = 0)
-            
-            R = np.array((fromState-np.min(fromState))/(np.max(fromState)-np.min(fromState))*255).astype(int)
-            G = np.array((sources-np.min(sources))/(np.max(sources)-np.min(sources))*255).astype(int)
-            B = np.array((sinks-np.min(sinks))/(np.max(sinks)-np.min(sinks))*255).astype(int)
-                        
-            for i, s in enumerate(fromState):
-                rgb[0:1, i] = [R[s-1], G[s-1], B[s-1]]
-
-            
-            newState = np.array(rgb)
-        
-        self.state = np.array(newState) if self.mode == "rgb_array" else np.array(fromState)
+        self.last_MHC = MHC
+        self.Actual_Minimum = self.movingTargetReward
+                    
         self.internal_state = np.array(fromState)
+        state = np.array(self.internal_state) if self.mode == 'human' else np.array(self.get_image())
+        done = True if self.step_counter>=self.max_steps else False 
         
-        return self.state, reward, False, {}
+        return state, reward, done, MHC
+        #return newState, reward, done
     
     def render(self, mode=None):
-        if self.mode == "human":
-                
-            SCALE = 1  # Scale size of pixels for displayability
-            img_h, img_w = SCALE, (len(self.internal_state))*SCALE
-            data = np.zeros((img_h, img_w, 3), dtype=np.uint8)
-            
-            sources = np.sum(self.TM, axis = 1)
-            sinks = np.sum(self.TM, axis = 0)
-            
-            R = np.array((self.internal_state-np.min(self.internal_state))/(np.max(self.internal_state)-np.min(self.internal_state))*255).astype(int)
-            G = np.array((sources-np.min(sources))/(np.max(sources)-np.min(sources))*255).astype(int)
-            B = np.array((sinks-np.min(sinks))/(np.max(sinks)-np.min(sinks))*255).astype(int)
-            
-            for i, s in enumerate(self.internal_state):
-                data[0*SCALE:1*SCALE, i*SCALE:(i+1)*SCALE] = [R[s-1], G[s-1], B[s-1]]
-                       
-            img = Image.fromarray(data, 'RGB')            
-                    
-        if self.mode == 'rgb_array':
-            img = Image.fromarray(self.state, 'RGB')            
-
+           
+        img = self.get_image()
         
         plt.imshow(img)
         plt.axis('off')
         plt.show()
-        return img
     
     def close(self):
         pass
@@ -144,6 +116,34 @@ class qapEnv(gym.Env):
         actions = [(i,j) for i in range(1,x) for j in range(i+1,x+1) if not i==j]
         actions.append((1,1))
         return actions      
+    
+        # FOR CNN #
+    def get_image(self):
+        rgb = np.zeros((self.x,self.y,3), dtype=np.uint8)
+            
+        sources = np.sum(self.TM, axis = 1)
+        sinks = np.sum(self.TM, axis = 0)
+        
+        state = self.internal_state
+        
+        R = np.array((state-np.min(state))/(np.max(state)-np.min(state))*255).astype(int)
+        G = np.array((sources-np.min(sources))/(np.max(sources)-np.min(sources))*255).astype(int)
+        B = np.array((sinks-np.min(sinks))/(np.max(sinks)-np.min(sinks))*255).astype(int)
+                        
+        k=0
+        a=0
+        Zeilen_ZAEHLER =0
+        for s in range(len(state)):
+            rgb[k][a] = [R[s], G[s], B[s]]
+            a+=1
+            if a>(self.x-1):
+                Zeilen_ZAEHLER+=1
+                k= Zeilen_ZAEHLER
+                a=0
+        
+        img = Image.fromarray(rgb, 'RGB')                     
+
+        return img 
     
 class fbsEnv(gym.Env):
     metadata = {'render.modes': ['rgb_array', 'human']}          
