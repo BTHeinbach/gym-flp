@@ -451,7 +451,7 @@ class ofpEnv(gym.Env):
         self.instance = instance 
         self.distance = distance
         self.aspect_ratio = 2 if aspect_ratio is None else aspect_ratio
-        self.step_size = 2 if step_size is None else step_size
+        self.step_size = 1 if step_size is None else step_size
         self.greenfield = False if greenfield is None else greenfield
             
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -491,7 +491,7 @@ class ofpEnv(gym.Env):
         self.min_width = self.min_side_length * self.aspect_ratio
 
         # 3. Define the possible actions: 5 for each box [toDo: plus 2 to manipulate sizes] + 1 idle action for each and respective action_space
-        action_set = ['up', 'down', 'right', 'left', 'keep']
+        action_set = ['N', 'E', 'S', 'W']
         self.action_list = [action_set[i] for j in range(self.n) for i in range(len(action_set))]
         self.action_space = spaces.Discrete(len(self.action_list)) #5 actions for each facility: left, up, down, right, rotate + idle action across all
         
@@ -500,25 +500,41 @@ class ofpEnv(gym.Env):
         # [facility y, facility x, facility width, facility length] --> [self.fac_y, self.fac_x, self.fac_width_y, self.fac_length_x]
         
         if self.mode == "rgb_array":
-            if self.W or self.L < 36:
-                self.W, self.L = 36, 36
+            if self.plant_Y < 36 or self.plant_X < 36:
+                self.plant_Y, self.plant_X = 36, 36
+        
+        
+        self.lower_bounds = {'Y': max(self.fac_width_y)/2,
+                             'X': max(self.fac_length_x)/2,
+                             'y': min(self.fac_width_y),
+                             'x': min(self.fac_length_x)}
+        
+        self.upper_bounds = {'Y': self.plant_Y - max(self.fac_width_y)/2,
+                             'X': self.plant_X - max(self.fac_length_x)/2,
+                             'y': max(self.fac_width_y),
+                             'x': max(self.fac_length_x)}
+        
+        observation_low = np.zeros(4* self.n)
+        observation_high = np.zeros(4* self.n)
+        
+        observation_low[0::4] = self.lower_bounds['Y']
+        observation_low[1::4] = self.lower_bounds['X']
+        observation_low[2::4] = self.lower_bounds['y']
+        observation_low[3::4] = self.lower_bounds['x']
+        
+        observation_high[0::4] = self.upper_bounds['Y']
+        observation_high[1::4] = self.upper_bounds['X']
+        observation_high[2::4] = self.upper_bounds['y']
+        observation_high[3::4] = self.upper_bounds['x'] 
             
-            self.observation_space = spaces.Box(low = 0, high = 255, shape= (3, self.plant_Y, self.plant_X), dtype = np.uint8) # Image representation, channel-last for PyTorch CNNs
+        #Keep a version of this to sample initial states from in reset()
+        self.state_space = spaces.Box(low=observation_low, high=observation_high, dtype = np.uint8) 
+        
+        
+        if self.mode == "rgb_array":
+            self.observation_space = spaces.Box(low = 0, high = 255, shape= (self.plant_Y, self.plant_X, 3), dtype = np.uint8) # Image representation, channel-last for PyTorch CNNs
+
         elif self.mode == "human":
-            
-            observation_low = np.zeros(4* self.n)
-            observation_high = np.zeros(4* self.n)
-            
-            observation_low[0::4] = 0
-            observation_low[1::4] = 0
-            observation_low[2::4] = self.min_length
-            observation_low[3::4] = self.min_width
-            
-            observation_high[0::4] = self.plant_Y
-            observation_high[1::4] = self.plant_X
-            observation_high[2::4] = max(self.fac_width_y)
-            observation_high[3::4] = max(self.fac_length_x)
-            
             self.observation_space = spaces.Box(low=observation_low, high=observation_high, dtype = np.uint8) # Vector representation of coordinates
         else:
             print("Nothing correct selected")
@@ -528,226 +544,199 @@ class ofpEnv(gym.Env):
         self.state = None # Variable for state being returned to agent
         self.internal_state = None #Placeholder for state variable for internal manipulation in rgb_array mode
         self.counter = 0
-        self.pseudo_stability = 100 #If the reward has not improved in the last 200 steps, terminate the episode
+        self.pseudo_stability = 50 #If the reward has not improved in the last 100 steps, terminate the episode
         self.best_reward = None
-
+        self.reset_counter = 0
         self.MHC = rewards.mhc.MHC() 
-    
+       
     def reset(self):
-        # Start with random x and y positions
-         
-        rng = default_rng()
-        state_prelim = self.observation_space.sample() if self.mode == 'human' else np.zeros(4*self.n)
-        
-        x = state_prelim[1::4] if self.mode == 'human' else rng.integers(low=0, high=(self.L-max(self.l)), size=(self.n,))
-        y = state_prelim[0::4] if self.mode == 'human' else rng.integers(low=0, high=(self.W-max(self.w)), size=(self.n,))
-        
-        # Override length (l) and width (w) or facilities with data from instances 
-        state_prelim[0::4] = y
-        state_prelim[1::4]= x
-        state_prelim[2::4] = self.w
-        state_prelim[3::4] = self.l
 
-        self.D = getDistances(state_prelim[0::4], state_prelim[1::4])
-        mhc, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))
+        state_prelim = self.state_space.sample()
+        state_prelim[2::4] = self.fac_width_y
+        state_prelim[3::4] = self.fac_length_x
+
+        i=0
+        while self.collision_test(state_prelim) > 0:
+            state_prelim = self.state_space.sample()
+            state_prelim[2::4] = self.fac_width_y
+            state_prelim[3::4] = self.fac_length_x
+            i += 1
+            if i > 1000:
+                break
+        
+        
+        # Create fixed positions for reset:
+        Y = np.floor(np.outer(np.array([0,0.25,0.5,0.75,1]),self.upper_bounds['Y']))
+        X = np.floor(np.outer([0, 1/3, 2/3, 1],self.upper_bounds['X']))
+        
+        if self.n==12:
+            
+            y_centroids = np.tile(np.floor([(i+j)/2 for i,j in zip(Y[:,-1], Y[1:,])]).flatten(),3)
+            x_centroids = np.tile(np.floor([(i+j)/2 for i,j in zip(X[:,-1], X[1:,])]),4).flatten()
+            
+            state_prelim[0::4] = y_centroids
+            state_prelim[1::4] = x_centroids
+        
+        elif self.n==6:
+            '''
+            state_prelim[0]=np.floor(self.upper_bounds['Y'])/2
+            state_prelim[1]=np.floor(self.upper_bounds['X'])/2
+            state_prelim[4]=np.floor(self.upper_bounds['Y'])-1
+            state_prelim[5]=np.floor(self.lower_bounds['X'])+1
+            state_prelim[8]=np.floor(self.lower_bounds['Y'])+1
+            state_prelim[9]=np.floor(self.lower_bounds['X'])+1
+            state_prelim[12]=np.floor(self.upper_bounds['Y'])-1
+            state_prelim[13]=np.floor(self.upper_bounds['X'])-1
+            state_prelim[16]=np.floor(self.upper_bounds['Y'])/2
+            state_prelim[17]=np.floor(self.upper_bounds['X'])-1
+            state_prelim[20]=np.floor(self.lower_bounds['Y'])+1
+            state_prelim[21]=np.floor(self.upper_bounds['X'])-1
+            '''
+            
+            #Shuffle
+            #u.re.
+            state_prelim[0]=np.floor(self.upper_bounds['Y'])-1
+            state_prelim[1]=np.floor(self.upper_bounds['X'])-1
+            
+            #o.re.
+            state_prelim[4]=np.floor(self.lower_bounds['Y'])+2
+            state_prelim[5]=np.floor(self.upper_bounds['X'])-1
+            
+            #Mitte
+            state_prelim[8]=np.floor(self.upper_bounds['Y'])/2
+            state_prelim[9]=np.floor(self.upper_bounds['X'])/2
+            
+            #u.li.
+            state_prelim[12]=np.floor(self.upper_bounds['Y'])-1
+            state_prelim[13]=np.floor(self.lower_bounds['X'])+2
+            
+            #Mitte re.
+            state_prelim[16]=np.floor(self.upper_bounds['Y'])/2
+            state_prelim[17]=np.floor(self.upper_bounds['X'])-1
+            
+            #o.li.
+            state_prelim[20]=np.floor(self.lower_bounds['Y'])+2
+            state_prelim[21]=np.floor(self.lower_bounds['X'])+2
         
         self.internal_state = np.array(state_prelim)
-        self.state = np.array(state_prelim) if self.mode == 'human' else self.ConvertCoordinatesToState(state_prelim)
+        self.state = np.array(self.internal_state) if self.mode == 'human' else self.ConvertCoordinatesToState(self.internal_state)
         self.counter = 0
+        
+        self.D = getDistances(state_prelim[1::4], state_prelim[0::4])
+        mhc, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))
         self.last_cost = mhc
         
-        # Ensure a collision-free, feasible starting layout:                         
+        return np.array(self.state)
+    
+    def collision_test(self, state):
         
-        i = 0
-        while self.collision_test(self.internal_state[1::4],self.internal_state[0::4],self.internal_state[3::4],self.internal_state[2::4]) > 0:
-            self.reset()
-            i += 1
-            if i > 10000:
-                break
-           
-        return self.state.copy()
-
-    def collision_test(self, y, x, w, l):      
+        y=state[0::4]
+        x=state[1::4]
+        w=state[2::4]
+        l=state[3::4]
         
-        # collision test
-        collisions = 0 #initialize collision for each collision test
-       
-        for i in range (0, self.n-1):
-            for j in range (i+1,self.n):                
-                if not(x[i]+0.5*l[i] < x[j]-0.5*l[j] or 
-                       x[i]-0.5*l[i] > x[j]+0.5*l[j] or 
-                       y[i]-0.5*w[i] > y[j]+0.5*w[j] or 
-                       y[i]+0.5*w[i] < y[j]-0.5*w[j]):
-                    collisions += 1
+        collisions = 0
+        
+        for i in range(0,self.n-1):
+            for j in range(i+1, self.n):
+                if not (x[i]+0.5*l[i] <= x[j]-0.5*l[j] or 
+                        x[i]-0.5*l[i] >= x[j]+0.5*l[j] or
+                        y[i]+0.5*w[i] <= y[j]-0.5*w[j] or
+                        y[i]-0.5*w[i] >= y[j]+0.5*w[j]):
+                    collisions +=1
                     break
         return collisions
-
+    
     def step(self, action):        
-        m = np.int(np.ceil((action+1)/5))   # Facility on which the action is
+        m = np.int(np.ceil((action+1)/4))   # Facility on which the action is
         step_size = self.step_size       
         
         temp_state = np.array(self.internal_state) # Get copy of state to manipulate:
         old_state = np.array(self.internal_state)  # Keep copy of state to restore if boundary condition is met       
+        done = False
         
-        penalty = 0 
         # Do the action 
-        if self.action_list[action] == "up": 
-           
-            if (temp_state[4*(m-1)] + temp_state[4*(m-1) + 2]*0.5 + step_size) > self.W:
-                out_of_bounds = True
-                penalty = -1000
-                temp_state = np.array(old_state)
-            else:
-                temp_state[4*(m-1)] += step_size
-        
-        elif self.action_list[action] == "down": 
-           
-            if (temp_state[4*(m-1)] - temp_state[4*(m-1) + 2]*0.5 - step_size) < 0:
-                out_of_bounds = True
-                penalty = -1000
-                temp_state = np.array(old_state)
-            else:
-                temp_state[4*(m-1)] -= step_size
-        
-        elif self.action_list[action] == "left": 
-           
-            if (temp_state[4*(m-1)+1] - temp_state[4*(m-1) + 3]*0.5 - step_size) < 0:
-                out_of_bounds = True
-                penalty = -1000
-                temp_state = np.array(old_state)
-            else:
-                temp_state[4*(m-1)+1] -= step_size
+        if self.action_list[action] == "S":
+            temp_state[4*(m-1)] += step_size
+
+        elif self.action_list[action] == "N": 
+            temp_state[4*(m-1)] -= step_size
                 
-        elif self.action_list[action] == "right": 
-           
-            if (temp_state[4*(m-1)+1] + temp_state[4*(m-1) + 3]*0.5 + step_size) > self.L:
-                out_of_bounds = True
-                penalty = -1000
-                temp_state = np.array(old_state)
-            else:
-                temp_state[4*(m-1)+1] += step_size        
-                
+        elif self.action_list[action] == "W": 
+            temp_state[4*(m-1)+1] -= step_size
+                      
+        elif self.action_list[action] == "E": 
+            temp_state[4*(m-1)+1] += step_size 
+                                
         elif self.action_list[action] == "keep":
-            None #Leave everything as is
+            temp_state = temp_state
         
         else:
             raise ValueError("Received invalid action={} which is not part of the action space".format(action))
         
+        self.D = getDistances(temp_state[1::4], temp_state[0::4])
+        mhc, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))   
         
-        self.fac_x, self.fac_y, self.fac_b, self.fac_h = temp_state[1::4], temp_state[0::4], temp_state[3::4], temp_state[2::4] # ToDo: Read this from self.state
-        self.D = getDistances(self.fac_x, self.fac_y)
+        
+        if not self.state_space.contains(temp_state):
+            done = True
+            penalty = -1
+            temp_state = np.array(old_state)
+        else:
+            penalty = 0
 
-        reward, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))   
-        
-        # Test if initial state causing a collision. If yes than initialize a new state until there is no collision
-        collisions = self.collision_test(temp_state[0::4],temp_state[1::4], temp_state[2::4], temp_state[3::4]) # Pass every 4th item starting at 0 (x pos) and 1 (y pos) for checking 
-        collision_penalty = -100 * collisions
-               
-        # Make new state for observation
+        # #2 Test if initial state causing a collision. If yes than initialize a new state until there is no collision
+        collisions = self.collision_test(temp_state) # Pass every 4th item starting at 0 (x pos) and 1 (y pos) for checking 
+        collision_penalty = -1 if collisions>0 else 0
+
+                # Make new state for observation
         self.internal_state = np.array(temp_state) # Keep a copy of the vector representation for future steps
-        self.state = self.ConvertCoordinatesToState(self.internal_state) if self.mode == 'rgb_array' else self.internal_state
+        self.state = self.ConvertCoordinatesToState(np.array(self.internal_state)) if self.mode == 'rgb_array' else np.array(self.internal_state)
         
-        # Make rewards for observation
-        if mhc < self.best_reward:
-           # print('New lowest mhc:', mhc)
-            self.best_reward = mhc
-            
+                # Make rewards for observation
+        if mhc < self.last_cost:
+            self.last_cost = mhc
             self.counter = 0
-            cost_penalty = 10
-        
-        elif mhc == self.best_reward:
-            self.counter +=1
-            cost_penalty = 0
+            cost_penalty = 1
         else:
             self.counter +=1
-            cost_penalty = -1
+            cost_penalty =0
+
+        reward = penalty + cost_penalty + collision_penalty
         
         # Check for terminality for observation
-        done = True if self.counter >= self.pseudo_stability else False 
-            
+        if self.counter >= self.pseudo_stability:
+            done = True 
         
-        return self.state, -reward + penalty, done,  {'mhc': mhc}
+        return np.array(self.state), reward, done,  {'mhc': mhc}        
     
     def ConvertCoordinatesToState(self, state_prelim):    
-        data = np.zeros((self.observation_space.shape)) if self.mode == 'rgb_array' else np.zeros((self.W, self.L, 3),dtype=np.uint8)
+        data = np.zeros((self.plant_Y, self.plant_X, 3),dtype=np.uint8)
         
-        sources = np.sum(self.TM, axis = 1)
-        sinks = np.sum(self.TM, axis = 0)
+        sources = np.sum(self.F, axis = 1)
+        sinks = np.sum(self.F, axis = 0)
         
         p = np.arange(self.n)
-        R = np.array((p-np.min(p))/(np.max(p)-np.min(p))*255).astype(int)
+        
+        #R = np.array((p-np.min(p))/(np.max(p)-np.min(p))*255).astype(int)
+        R = np.ones(shape=(self.n,)).astype(int)*255
         G = np.array((sources-np.min(sources))/(np.max(sources)-np.min(sources))*255).astype(int)
         B = np.array((sinks-np.min(sinks))/(np.max(sinks)-np.min(sinks))*255).astype(int)
-        
+       
         for x, p in enumerate(p):
-            x_from = state_prelim[4*x+0] -0.5 * state_prelim[4*x+2]
-            y_from = state_prelim[4*x+1] -0.5 * state_prelim[4*x+3]
-            x_to = state_prelim[4*x+0] + 0.5 * state_prelim[4*x+2]
-            y_to = state_prelim[4*x+1] + 0.5 * state_prelim[4*x+3]
+            y_from = state_prelim[4*x+0] -0.5 * state_prelim[4*x+2]
+            x_from = state_prelim[4*x+1] -0.5 * state_prelim[4*x+3]
+            y_to = state_prelim[4*x+0] + 0.5 * state_prelim[4*x+2]
+            x_to = state_prelim[4*x+1] + 0.5 * state_prelim[4*x+3]
         
             data[int(y_from):int(y_to), int(x_from):int(x_to)] = [R[p-1], G[p-1], B[p-1]]
-
         return np.array(data, dtype=np.uint8)
-    
-    def constructState(self, x, y, b, h, n):
-        # Construct state
-        state_prelim = np.zeros((4*n,), dtype=float)
-        state_prelim[0::4] = y
-        state_prelim[1::4] = x
-        state_prelim[2::4] = b
-        state_prelim[3::4] = h
         
-        if self.mode == "human":
-            self.state = np.array(state_prelim)
-        
-        elif self.mode == "rgb_array":
-            self.state = self.ConvertCoordinatesToState(state_prelim)
-            
-        return self.state[:]
-    
-    def render(self):       
-        from gym.envs.classic_control import rendering
-        if self.viewer is None:
-            self.viewer = rendering.Viewer(self.plant_Y, self.plant_X)
-            self.viewer.set_bounds(0, self.plant_X, 0, self.plant_Y)
-            
-        
-        p = np.arange(self.n)
-        
-        '''
-        ### Version for distance-specific coloring
-        sources = np.sum(self.TM, axis = 1)
-        sinks = np.sum(self.TM, axis = 0)       
-        R = np.array((p-np.min(p))/(np.max(p)-np.min(p))*200+55).astype(int)
-        G = np.array((sources-np.min(sources))/(np.max(sources)-np.min(sources))*200+55).astype(int)
-        B = np.array((sinks-np.min(sinks))/(np.max(sinks)-np.min(sinks))*200+55).astype(int)
-        '''
-        
-        ###Version for flow-specific colouring        
-        flows = np.sum(self.F, axis = 1)
-        R = np.array((p-np.min(p))/(np.max(p)-np.min(p))*200).astype(int)       
-        B = np.ones((self.n,))*200 # set static
-        G = np.array((flows-np.min(flows))/(np.max(flows)-np.min(flows))*200).astype(int)
-        
-        
-        for i in range(int(len(self.internal_state)/4)):
-            y = np.int(self.internal_state[4*i])
-            x = np.int(self.internal_state[4*i+1])
-            l = np.int(self.internal_state[4*i+2])
-            w = np.int(self.internal_state[4*i+3])
-            
-            left = np.int(x-0.5*w)
-            right = np.int(x+0.5*w)
-            top = np.int(y - 0.5*l)
-            bottom = np.int(y + 0.5*l)
-            
-            self.viewer.draw_polygon([(left,bottom), (left,top), (right,top), (right,bottom)], color=(R[i]/255, G[i]/255, B[i]/255))
-        return self.viewer.render(return_rgb_array = mode=='rgb_array') 
+    def render(self, mode = None):       
+        return Image.fromarray(self.ConvertCoordinatesToState(self.internal_state), 'RGB') #Convert channel-first back to channel-last for image display
         
     def close(self):
-        if self.viewer is not None:
-            self.viewer.close()
-            self.viewer = None
+        pass
         
 
 class stsEnv(gym.Env):
