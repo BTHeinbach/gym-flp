@@ -1,16 +1,18 @@
-import numpy as np
+import math
+import os
+import pickle
+
+import anytree
 import gym
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image
+from anytree import Node
 from gym import spaces
 from numpy.random import default_rng
-import pickle
-import os
-import math
-import matplotlib.pyplot as plt
-from PIL import Image
+
 from gym_flp import rewards
-from IPython.display import display, clear_output
-import anytree
-from anytree import Node, RenderTree, PreOrderIter, LevelOrderIter, LevelOrderGroupIter
+
 
 class qapEnv(gym.Env):
     metadata = {'render.modes': ['rgb_array', 'human']}  
@@ -443,7 +445,8 @@ class ofpEnv(gym.Env):
        |       |_|y              |   
        |_________________________|
         
-        
+      2022 update:
+      machine class implemented  
       '''    
     
     def __init__(self, mode = None, instance = None, distance = None, aspect_ratio = None, step_size = None, greenfield = None):
