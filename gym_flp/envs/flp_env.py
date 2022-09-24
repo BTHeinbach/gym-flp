@@ -460,7 +460,7 @@ class ofpEnv(gym.Env):
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
         
         self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,'continual', 'cont_instances.pkl'), 'rb'))
-        
+        print(self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths )
         while not (self.instance in self.FlowMatrices.keys() or self.instance in ['Brewery']):
             print('Available Problem Sets:', self.FlowMatrices.keys())
             self.instance = input('Pick a problem:').strip()
@@ -628,7 +628,7 @@ class ofpEnv(gym.Env):
         self.D = getDistances(state_prelim[1::4], state_prelim[0::4])
         mhc, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))
         self.last_cost = mhc
-        
+        # print(self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths)
         return np.array(self.state)
     
     def collision_test(self, state):
@@ -735,7 +735,8 @@ class ofpEnv(gym.Env):
             data[int(y_from):int(y_to), int(x_from):int(x_to)] = [R[p-1], G[p-1], B[p-1]]
         return np.array(data, dtype=np.uint8)
         
-    def render(self, mode = None):       
+    def render(self, mode = None): 
+        print("HIi")
         return Image.fromarray(self.ConvertCoordinatesToState(self.internal_state), 'RGB') #Convert channel-first back to channel-last for image display
         
     def close(self):
