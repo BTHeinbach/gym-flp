@@ -30,20 +30,25 @@ train_steps = np.append(np.outer(10.0**(np.arange(4, 6)), np.arange(1,10,1)).fla
 train_steps = [2e6]
 
 vec_env = make_vec_env('ofp-v1', env_kwargs={'mode': mode, "instance":instance})
+print("1")
 wrap_env = gym.make('ofp-v1', mode = mode, instance=instance)
+print("2")
 wrap_env = VecTransposeImage(vec_env)
-
+print("3")
 vec_eval_env = make_vec_env('ofp-v1', env_kwargs={'mode': mode, "instance":instance})
+print("4")
 
 wrap_eval_env = gym.make('ofp-v1', mode = mode, instance=instance)
+print("5")
 wrap_eval_env = VecTransposeImage(vec_eval_env)
+print("6")
 
 experiment_results={}
 
 for ts in train_steps:
     ts = int(ts)
-    # print('=====',ts)
-    save_path = f"{timestamp}_{instance}_{algo}_{mode}_{environment}_movingavg_nocollisions_{ts}_exp2"
+    print('=====',ts)
+    save_path = f"{timestamp}_{instance}_{algo}_{mode}_{environment}_movingavg_nocollisions_{ts}_exp4"
     
     eval_callback = EvalCallback(wrap_eval_env , 
                               best_model_save_path=f'./models/best_model/{save_path}',
