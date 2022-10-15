@@ -29,7 +29,7 @@ experiment_results={}
 
 for ts in train_steps:
     ts = int(ts)
-    print(ts)
+    #print(ts)
     save_path = f"{timestamp}_{instance}_{algo}_{mode}_{environment}_movingavg_nocollisions_{ts}"
     
     eval_callback = EvalCallback(wrap_eval_env , 
@@ -95,7 +95,7 @@ for ts in train_steps:
     
     cost_saved = final_cost-start_cost
     cost_saved_rel = 1-(start_cost/final_cost)
-    print(cost_saved, cost_saved_rel, '%')
+    #print(cost_saved, cost_saved_rel, '%')
     experiment_results[ts]=[cost_saved, cost_saved_rel]
     ax1.plot(rewards)
     ax2.plot(mhc)

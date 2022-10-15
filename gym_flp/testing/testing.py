@@ -7,5 +7,7 @@ s0 = env.reset()
 
 for _ in range(1):
     a = env.action_space.sample()
-
+    print(a)
     s1, r, i, d = env.step(a)
+    img = env.render()
+    img.show()
