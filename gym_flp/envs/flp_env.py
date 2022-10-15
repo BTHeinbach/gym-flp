@@ -497,6 +497,7 @@ class ofpEnv(gym.Env):
         action_set = ['N', 'E', 'S', 'W']
         self.action_list = [action_set[i] for j in range(self.n) for i in range(len(action_set))]
         self.action_space = spaces.Discrete(len(self.action_list)) #5 actions for each facility: left, up, down, right, rotate + idle action across all
+        #self.action_space = spaces.Box(low=np.array([0, max(self.fac_width_y)/2, max(self.fac_length_x)/2]), high = np.array([self.n, self.plant_Y - max(self.fac_width_y)/2, self.plant_X - max(self.fac_length_x)/2 ]), dtype=np.int8)
         
         # 4. Define observation_space for human and rgb_array mode 
         # Formatting for the observation_space:
@@ -652,12 +653,19 @@ class ofpEnv(gym.Env):
     
     def step(self, action):        
         m = np.int(np.ceil((action+1)/4))   # Facility on which the action is
-        step_size = self.step_size       
+        step_size = self.step_size
+
+        #m = int(action[0])
+        #print(action[0])
         
         temp_state = np.array(self.internal_state) # Get copy of state to manipulate:
         old_state = np.array(self.internal_state)  # Keep copy of state to restore if boundary condition is met       
         done = False
-        
+
+        #temp_state[4*(m-1)] = action[1]
+        #temp_state[4 * (m - 1)+1] = action[2]
+
+
         # Do the action 
         if self.action_list[action] == "S":
             temp_state[4*(m-1)] += step_size

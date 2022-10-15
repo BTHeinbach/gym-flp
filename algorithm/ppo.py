@@ -12,13 +12,13 @@ from stable_baselines3.common.vec_env import VecEnv, VecTransposeImage, DummyVec
 import imageio
 from PIL import Image
 
-instance = 'P12'
+instance = 'P6'
 timestamp = datetime.datetime.now().strftime("%y%m%d_%H%M")
 environment = 'ofp'
 algo = 'ppo'
 mode = 'rgb_array'
 train_steps = np.append(np.outer(10.0**(np.arange(4, 6)), np.arange(1,10,1)).flatten(), 10**6)
-train_steps = [5e6]
+train_steps = [1e6]
 vec_env = make_vec_env('ofp-v0', env_kwargs={'mode': mode, "instance":instance}, n_envs=1)
 wrap_env = VecTransposeImage(vec_env)
 
