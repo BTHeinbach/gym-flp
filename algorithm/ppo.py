@@ -18,7 +18,7 @@ environment = 'ofp'
 algo = 'ppo'
 mode = 'rgb_array'
 train_steps = np.append(np.outer(10.0**(np.arange(4, 6)), np.arange(1,10,1)).flatten(), 10**6)
-train_steps = [1e6]
+train_steps = [10e6]
 vec_env = make_vec_env('ofp-v0', env_kwargs={'mode': mode, "instance":instance}, n_envs=1)
 wrap_env = VecTransposeImage(vec_env)
 
@@ -34,11 +34,11 @@ for ts in train_steps:
     
     eval_callback = EvalCallback(wrap_eval_env , 
                              best_model_save_path=f'./models/best_model/{save_path}',
-                             log_path='./logs/', 
+                             log_path='./logs/',
                              eval_freq=10000,
                              deterministic=True, 
                              render=False,
-                             n_eval_episodes = 5)
+                             n_eval_episodes = 10)
     
     model = PPO("CnnPolicy", 
                 vec_env, 
@@ -66,7 +66,7 @@ for ts in train_steps:
     model.learn(total_timesteps=ts, callback=eval_callback)
     model.save(f"./models/{save_path}")
     
-    #odel = PPO.load(f"./models/211107_1741_P12_ppo_rgb_array_ofp_movingavg_2000000")
+    #model = PPO.load(f"./models/221015_2201_P6_ppo_rgb_array_ofp_movingavg_nocollisions_1000000")
     fig, (ax1,ax2) = plt.subplots(2,1)
     
     obs = wrap_env.reset()
