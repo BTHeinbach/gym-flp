@@ -449,7 +449,7 @@ class ofpEnv(gym.Env):
       machine class implemented  
       '''    
     
-    def __init__(self, mode = None, instance = None, distance = None, aspect_ratio = None, step_size = None, greenfield = None):
+    def __init__(self, mode=None, instance=None, distance=None, aspect_ratio=None, step_size=None, greenfield=None):
         self.mode = mode
         self.instance = instance 
         self.distance = distance
@@ -497,6 +497,7 @@ class ofpEnv(gym.Env):
         action_set = ['N', 'E', 'S', 'W']
         self.action_list = [action_set[i] for j in range(self.n) for i in range(len(action_set))]
         self.action_space = spaces.Discrete(len(self.action_list)) #5 actions for each facility: left, up, down, right, rotate + idle action across all
+        #self.action_space = spaces.Box(low=np.array([0, max(self.fac_width_y)/2, max(self.fac_length_x)/2]), high = np.array([self.n, self.plant_Y - max(self.fac_width_y)/2, self.plant_X - max(self.fac_length_x)/2 ]), dtype=np.int8)
         
         # 4. Define observation_space for human and rgb_array mode 
         # Formatting for the observation_space:
@@ -507,13 +508,13 @@ class ofpEnv(gym.Env):
                 self.plant_Y, self.plant_X = 36, 36
         
         
-        self.lower_bounds = {'Y': max(self.fac_width_y)/2,
-                             'X': max(self.fac_length_x)/2,
+        self.lower_bounds = {'Y': 0,
+                             'X': 0,
                              'y': min(self.fac_width_y),
                              'x': min(self.fac_length_x)}
         
-        self.upper_bounds = {'Y': self.plant_Y - max(self.fac_width_y)/2,
-                             'X': self.plant_X - max(self.fac_length_x)/2,
+        self.upper_bounds = {'Y': self.plant_Y - max(self.fac_width_y),
+                             'X': self.plant_X - max(self.fac_length_x),
                              'y': max(self.fac_width_y),
                              'x': max(self.fac_length_x)}
         
@@ -532,16 +533,8 @@ class ofpEnv(gym.Env):
             
         #Keep a version of this to sample initial states from in reset()
         self.state_space = spaces.Box(low=observation_low, high=observation_high, dtype = np.uint8) 
-        
-        
-        if self.mode == "rgb_array":
-            self.observation_space = spaces.Box(low = 0, high = 255, shape= (self.plant_Y, self.plant_X, 3), dtype = np.uint8) # Image representation, channel-last for PyTorch CNNs
+        self.observation_space = spaces.Box(low = 0, high = 255, shape= (self.plant_Y, self.plant_X, 3), dtype = np.uint8) # Image representation, channel-last for PyTorch CNNs
 
-        elif self.mode == "human":
-            self.observation_space = spaces.Box(low=observation_low, high=observation_high, dtype = np.uint8) # Vector representation of coordinates
-        else:
-            print("Nothing correct selected")
-            
         # 5. Set some starting points
         self.reward = 0
         self.state = None # Variable for state being returned to agent
@@ -652,12 +645,19 @@ class ofpEnv(gym.Env):
     
     def step(self, action):        
         m = np.int(np.ceil((action+1)/4))   # Facility on which the action is
-        step_size = self.step_size       
+        step_size = self.step_size
+
+        #m = int(action[0])
+        #print(action[0])
         
         temp_state = np.array(self.internal_state) # Get copy of state to manipulate:
         old_state = np.array(self.internal_state)  # Keep copy of state to restore if boundary condition is met       
         done = False
-        
+
+        #temp_state[4*(m-1)] = action[1]
+        #temp_state[4 * (m - 1)+1] = action[2]
+
+
         # Do the action 
         if self.action_list[action] == "S":
             temp_state[4*(m-1)] += step_size
@@ -727,10 +727,10 @@ class ofpEnv(gym.Env):
         B = np.array((sinks-np.min(sinks))/(np.max(sinks)-np.min(sinks))*255).astype(int)
        
         for x, p in enumerate(p):
-            y_from = state_prelim[4*x+0] -0.5 * state_prelim[4*x+2]
-            x_from = state_prelim[4*x+1] -0.5 * state_prelim[4*x+3]
-            y_to = state_prelim[4*x+0] + 0.5 * state_prelim[4*x+2]
-            x_to = state_prelim[4*x+1] + 0.5 * state_prelim[4*x+3]
+            y_from = state_prelim[4*x+0]
+            x_from = state_prelim[4*x+1]
+            y_to = state_prelim[4*x+0] + state_prelim[4*x+2]
+            x_to = state_prelim[4*x+1] + state_prelim[4*x+3]
         
             data[int(y_from):int(y_to), int(x_from):int(x_to)] = [R[p-1], G[p-1], B[p-1]]
         return np.array(data, dtype=np.uint8)
@@ -895,15 +895,15 @@ class stsEnv(gym.Env):
                 
                 new_name = None if not len(c)==1 else c[0]
                 
-                Node(name = new_name, \
-                     contains = contains, \
-                     parent = parent, \
-                     area = area, \
-                     width = width, \
-                     length = length, \
-                     upper_left = starting_point, \
-                     lower_right = starting_point + np.array([width, length]), \
-                     dtype = float)
+                Node(name=new_name,
+                     contains=contains,
+                     parent=parent,
+                     area=area,
+                     width=width,
+                     length=length,
+                     upper_left=starting_point,
+                     lower_right=starting_point + np.array([width, length]),
+                     dtype=float)
                 
                 starting_point = starting_point + np.array([0, length]) if parent.name == 'V' else starting_point + np.array([width, 0])
                 

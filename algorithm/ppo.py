@@ -12,13 +12,13 @@ from stable_baselines3.common.vec_env import VecEnv, VecTransposeImage, DummyVec
 import imageio
 from PIL import Image
 
-instance = 'P12'
+instance = 'P6'
 timestamp = datetime.datetime.now().strftime("%y%m%d_%H%M")
 environment = 'ofp'
 algo = 'ppo'
 mode = 'rgb_array'
 train_steps = np.append(np.outer(10.0**(np.arange(4, 6)), np.arange(1,10,1)).flatten(), 10**6)
-train_steps = [5e6]
+train_steps = [10e6]
 vec_env = make_vec_env('ofp-v0', env_kwargs={'mode': mode, "instance":instance}, n_envs=1)
 wrap_env = VecTransposeImage(vec_env)
 
@@ -29,16 +29,16 @@ experiment_results={}
 
 for ts in train_steps:
     ts = int(ts)
-    print(ts)
+    #print(ts)
     save_path = f"{timestamp}_{instance}_{algo}_{mode}_{environment}_movingavg_nocollisions_{ts}"
     
     eval_callback = EvalCallback(wrap_eval_env , 
                              best_model_save_path=f'./models/best_model/{save_path}',
-                             log_path='./logs/', 
+                             log_path='./logs/',
                              eval_freq=10000,
                              deterministic=True, 
                              render=False,
-                             n_eval_episodes = 5)
+                             n_eval_episodes = 10)
     
     model = PPO("CnnPolicy", 
                 vec_env, 
@@ -66,7 +66,7 @@ for ts in train_steps:
     model.learn(total_timesteps=ts, callback=eval_callback)
     model.save(f"./models/{save_path}")
     
-    #odel = PPO.load(f"./models/211107_1741_P12_ppo_rgb_array_ofp_movingavg_2000000")
+    #model = PPO.load(f"./models/221015_2201_P6_ppo_rgb_array_ofp_movingavg_nocollisions_1000000")
     fig, (ax1,ax2) = plt.subplots(2,1)
     
     obs = wrap_env.reset()
@@ -95,7 +95,7 @@ for ts in train_steps:
     
     cost_saved = final_cost-start_cost
     cost_saved_rel = 1-(start_cost/final_cost)
-    print(cost_saved, cost_saved_rel, '%')
+    #print(cost_saved, cost_saved_rel, '%')
     experiment_results[ts]=[cost_saved, cost_saved_rel]
     ax1.plot(rewards)
     ax2.plot(mhc)
