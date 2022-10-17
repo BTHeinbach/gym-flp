@@ -17,7 +17,7 @@ class qapEnv(gym.Env):
 
     def __init__(self, mode=None, instance=None):
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-        self.DistanceMatrices, self.FlowMatrices = pickle.load(open(os.path.join(__location__,'discrete', 'qap_matrices.pkl'), 'rb'))
+        self.DistanceMatrices, self.FlowMatrices = pickle.load(open(os.path.join(__location__, 'instances/discrete', 'qap_matrices.pkl'), 'rb'))
         self.transport_intensity = None
         self.instance = instance
         self.mode = mode
@@ -150,7 +150,8 @@ class fbsEnv(gym.Env):
     
     def __init__(self, mode=None, instance = None):
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,'continual', 'cont_instances.pkl'), 'rb'))
+        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,
+                                                                                                                            'instances/continual', 'cont_instances.pkl'), 'rb'))
         self.mode = mode
         
         self.instance = instance
@@ -443,12 +444,12 @@ class ofpEnv(gym.Env):
        |       |_|y              |   
        |_________________________|
         
-        
+      
       '''    
     
     def __init__(self, mode = None, instance = None, distance = None, aspect_ratio = None, step_size = None, greenfield = None):
-        self.mode = mode
-        self.instance = instance 
+        self.mode = mode if mode is not None else 'rgb_array'
+        self.instance = instance if instance is not None else 'P6'
         self.distance = distance
         self.aspect_ratio = 2 if aspect_ratio is None else aspect_ratio
         self.step_size = 1 if step_size is None else step_size
@@ -456,7 +457,8 @@ class ofpEnv(gym.Env):
             
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
         
-        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,'continual', 'cont_instances.pkl'), 'rb'))
+        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,
+                                                                                                                            'instances/continual', 'cont_instances.pkl'), 'rb'))
         
         while not (self.instance in self.FlowMatrices.keys() or self.instance in ['Brewery']):
             print('Available Problem Sets:', self.FlowMatrices.keys())
@@ -480,7 +482,7 @@ class ofpEnv(gym.Env):
             # Design a squared plant layout
             self.plant_X = int(round(math.sqrt(self.plant_area),0)) # We want the plant dimensions to be integers to fit them into an image
             self.plant_Y = self.plant_X 
-        
+
         if self.greenfield:
             self.plant_X = 2*self.plant_X
             self.plant_Y = 2*self.plant_Y
@@ -494,7 +496,8 @@ class ofpEnv(gym.Env):
         action_set = ['N', 'E', 'S', 'W']
         self.action_list = [action_set[i] for j in range(self.n) for i in range(len(action_set))]
         self.action_space = spaces.Discrete(len(self.action_list)) #5 actions for each facility: left, up, down, right, rotate + idle action across all
-        
+
+        self.action_space = spaces.Box(low=np.array([0, 0, 0]), high=np.array([self.n, ]))
         # 4. Define observation_space for human and rgb_array mode 
         # Formatting for the observation_space:
         # [facility y, facility x, facility width, facility length] --> [self.fac_y, self.fac_x, self.fac_width_y, self.fac_length_x]
@@ -504,16 +507,18 @@ class ofpEnv(gym.Env):
                 self.plant_Y, self.plant_X = 36, 36
         
         
-        self.lower_bounds = {'Y': max(self.fac_width_y)/2,
-                             'X': max(self.fac_length_x)/2,
+        self.lower_bounds = {'Y': 0,
+                             'X': 0,
                              'y': min(self.fac_width_y),
                              'x': min(self.fac_length_x)}
         
-        self.upper_bounds = {'Y': self.plant_Y - max(self.fac_width_y)/2,
-                             'X': self.plant_X - max(self.fac_length_x)/2,
+        self.upper_bounds = {'Y': self.plant_Y - max(self.fac_width_y),
+                             'X': self.plant_X - max(self.fac_length_x),
                              'y': max(self.fac_width_y),
                              'x': max(self.fac_length_x)}
-        
+
+        self.action_space = spaces.Box(low=np.array([0, 0, 0]), high=np.array([self.n, self.upper_bounds['Y'], self.upper_bounds['X']]),dtype=np.int8)
+
         observation_low = np.zeros(4* self.n)
         observation_high = np.zeros(4* self.n)
         
@@ -566,6 +571,7 @@ class ofpEnv(gym.Env):
         
         
         # Create fixed positions for reset:
+        '''
         Y = np.floor(np.outer(np.array([0,0.25,0.5,0.75,1]),self.upper_bounds['Y']))
         X = np.floor(np.outer([0, 1/3, 2/3, 1],self.upper_bounds['X']))
         
@@ -578,7 +584,6 @@ class ofpEnv(gym.Env):
             state_prelim[1::4] = x_centroids
         
         elif self.n==6:
-            '''
             state_prelim[0]=np.floor(self.upper_bounds['Y'])/2
             state_prelim[1]=np.floor(self.upper_bounds['X'])/2
             state_prelim[4]=np.floor(self.upper_bounds['Y'])-1
@@ -591,7 +596,7 @@ class ofpEnv(gym.Env):
             state_prelim[17]=np.floor(self.upper_bounds['X'])-1
             state_prelim[20]=np.floor(self.lower_bounds['Y'])+1
             state_prelim[21]=np.floor(self.upper_bounds['X'])-1
-            '''
+            
             
             #Shuffle
             #u.re.
@@ -617,7 +622,7 @@ class ofpEnv(gym.Env):
             #o.li.
             state_prelim[20]=np.floor(self.lower_bounds['Y'])+2
             state_prelim[21]=np.floor(self.lower_bounds['X'])+2
-        
+        '''
         self.internal_state = np.array(state_prelim)
         self.state = np.array(self.internal_state) if self.mode == 'human' else self.ConvertCoordinatesToState(self.internal_state)
         self.counter = 0
@@ -629,7 +634,10 @@ class ofpEnv(gym.Env):
         return np.array(self.state)
     
     def collision_test(self, state):
-        
+
+        state_greyscale = state[:,:,0]
+        collisions = np.sum(A&B)
+        '''
         y=state[0::4]
         x=state[1::4]
         w=state[2::4]
@@ -645,6 +653,7 @@ class ofpEnv(gym.Env):
                         y[i]-0.5*w[i] >= y[j]+0.5*w[j]):
                     collisions +=1
                     break
+        '''
         return collisions
     
     def step(self, action):        
@@ -686,10 +695,10 @@ class ofpEnv(gym.Env):
             penalty = 0
 
         # #2 Test if initial state causing a collision. If yes than initialize a new state until there is no collision
-        collisions = self.collision_test(temp_state) # Pass every 4th item starting at 0 (x pos) and 1 (y pos) for checking 
+        collisions = self.collision_test(temp_state) # Pass every 4th item starting at 0 (x pos) and 1 (y pos) for checking
         collision_penalty = -1 if collisions>0 else 0
 
-                # Make new state for observation
+        # Make new state for observation
         self.internal_state = np.array(temp_state) # Keep a copy of the vector representation for future steps
         self.state = self.ConvertCoordinatesToState(np.array(self.internal_state)) if self.mode == 'rgb_array' else np.array(self.internal_state)
         
@@ -724,10 +733,10 @@ class ofpEnv(gym.Env):
         B = np.array((sinks-np.min(sinks))/(np.max(sinks)-np.min(sinks))*255).astype(int)
        
         for x, p in enumerate(p):
-            y_from = state_prelim[4*x+0] -0.5 * state_prelim[4*x+2]
-            x_from = state_prelim[4*x+1] -0.5 * state_prelim[4*x+3]
-            y_to = state_prelim[4*x+0] + 0.5 * state_prelim[4*x+2]
-            x_to = state_prelim[4*x+1] + 0.5 * state_prelim[4*x+3]
+            y_from = state_prelim[4*x+0]
+            x_from = state_prelim[4*x+1]
+            y_to = state_prelim[4*x+0] + state_prelim[4*x+2]
+            x_to = state_prelim[4*x+1] + state_prelim[4*x+3]
         
             data[int(y_from):int(y_to), int(x_from):int(x_to)] = [R[p-1], G[p-1], B[p-1]]
         return np.array(data, dtype=np.uint8)
@@ -745,7 +754,8 @@ class stsEnv(gym.Env):
           
     def __init__(self, mode = None, instance = None):
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,'continual', 'cont_instances.pkl'), 'rb'))
+        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,
+                                                                                                                            'instances/continual', 'cont_instances.pkl'), 'rb'))
         self.instance = instance
         self.mode = mode
         self.MHC = rewards.mhc.MHC() 

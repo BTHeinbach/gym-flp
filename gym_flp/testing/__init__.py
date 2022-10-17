@@ -1,0 +1,1 @@
+from gym_flp.testing import machine_class
