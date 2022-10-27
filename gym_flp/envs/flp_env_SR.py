@@ -18,7 +18,7 @@ from gym import spaces
 from numpy.random import default_rng
 from gym_flp import rewards
 
-class ofpEnvs(gym.Env):
+class ofpEnvs (gym.Env):
     metadata = {'render.modes': ['rgb_array', 'human']} 
     '''
     - This environment class assumes a (bounded) planar area on which facilities are located on a continuum.
@@ -55,18 +55,18 @@ class ofpEnvs(gym.Env):
       '''    
     
     def __init__(self, mode = None, instance = None, distance = None, aspect_ratio = None, step_size = None, greenfield = None):
-        print("hi")
         self.mode = mode
+        print("Shimraz")
         self.instance = instance 
         self.distance = distance
         self.aspect_ratio = 2 if aspect_ratio is None else aspect_ratio
         self.step_size = 1 if step_size is None else step_size
         self.greenfield = False if greenfield is None else greenfield
-            
+        self.num_envs =1  
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
         
         self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,'continual', 'cont_instances.pkl'), 'rb'))
-        
+        # print(self.FlowMatrices)
         while not (self.instance in self.FlowMatrices.keys() or self.instance in ['Brewery']):
             print('Available Problem Sets:', self.FlowMatrices.keys())
             self.instance = input('Pick a problem:').strip()
@@ -75,11 +75,11 @@ class ofpEnvs(gym.Env):
         self.n = self.problems[self.instance]
         self.AreaData = self.sizes[self.instance]
         self.beta, self.fac_length_x, self.fac_width_y, self.fac_area, self.min_side_length = getAreaData(self.AreaData) #Investigate available area data and compute missing values if needed
-        
+        #print(self.beta, self.fac_length_x, self.fac_width_y, self.fac_area, self.min_side_length)
         if self.fac_width_y is None or self.fac_length_x is None:
             self.fac_length_x = np.random.randint(self.min_side_length*self.aspect_ratio, np.min(self.fac_area), size=(self.n, ))
             self.fac_width_y = np.round(self.fac_area/self.fac_length_x)
-            
+        # print("FLOW MATRICES",self.F)    
         # Check if there are Layout Dimensions available, if not provide enough (sqrt(a)*1.5)
         if self.instance in self.LayoutWidths.keys() and self.instance in self.LayoutLengths.keys():
             self.plant_X = int(self.LayoutLengths[self.instance]) # We need both values to be integers for converting into image
@@ -93,7 +93,7 @@ class ofpEnvs(gym.Env):
         if self.greenfield:
             self.plant_X = 2*self.plant_X
             self.plant_Y = 2*self.plant_Y
-
+            
         # These values need to be set manually, e.g. acc. to data from literature. Following Eq. 1 in Ulutas & Kulturel-Konak (2012), the minimum side length can be determined by assuming the smallest facility will occupy alone. 
         self.aspect_ratio = int(max(self.beta)) if not self.beta is None else self.aspect_ratio
         self.min_side_length = 1
@@ -104,13 +104,19 @@ class ofpEnvs(gym.Env):
         # self.action_list = [action_set[i] for j in range(self.n) for i in range(len(action_set))]
         # self.action_space = spaces.Discrete(len(self.action_list)) #5 actions for each facility: left, up, down, right, rotate + idle action across all
         
-        action_low = np.array([1,-1,-1])
-        action_high = np.array([self.n, 1,1])
-
-        self.action_space = spaces.Box(action_low,action_high, 
-                              shape=(3,) ,dtype= np.int8)
+        # action_low = np.array([1,-1,-1])
+        # action_high = np.array([self.n, 1,1])
         
+        # action space
+        # action_low = np.zeros(self.n)
+        # action_high =  np.ones(self.n)
         
+        # action_spaces =  np.ones(self.n*2, np.int8)*3 # expt-3
+        # self.action_space = spaces.MultiDiscrete(action_spaces ,dtype= np.int8) # expt-3 & 4 
+        
+        # print(self.action_space)
+        # self.action_space = spaces.Box(action_low,action_high, 
+        #                       shape=(1,) ,dtype=np.float32) 
         # 4. Define observation_space for human and rgb_array mode 
         # Formatting for the observation_space:
         # [facility y, facility x, facility width, facility length] --> [self.fac_y, self.fac_x, self.fac_width_y, self.fac_length_x]
@@ -118,18 +124,25 @@ class ofpEnvs(gym.Env):
         if self.mode == "rgb_array":
             if self.plant_Y < 36 or self.plant_X < 36:
                 self.plant_Y, self.plant_X = 36, 36
+        # print("---fac---",self.fac_width_y, self.plant_Y, self.fac_length_x,self.plant_X)
+        #self.action_space = spaces.MultiDiscrete(np.array([self.n,self.plant_X,self.plant_Y]),dtype= np.int8) # expt-1 & 2
+        # expt-4
+        # lis = [[]] * self.n
+        # lis[0].extend([self.plant_X,self.plant_Y])
         
-        
+        action_spaces = np.tile(np.array([self.plant_X,self.plant_Y], np.int8), self.n)
+        self.action_space = spaces.MultiDiscrete(action_spaces ,dtype= np.int8) # expt- 4 
+        print(self.action_space)
         self.lower_bounds = {'Y': max(self.fac_width_y)/2,
                              'X': max(self.fac_length_x)/2,
                              'y': min(self.fac_width_y),
                              'x': min(self.fac_length_x)}
-        
+        # print(self.lower_bounds)
         self.upper_bounds = {'Y': self.plant_Y - max(self.fac_width_y)/2,
                              'X': self.plant_X - max(self.fac_length_x)/2,
                              'y': max(self.fac_width_y),
                              'x': max(self.fac_length_x)}
-        
+        # print(self.upper_bounds)
         observation_low = np.zeros(4* self.n)
         observation_high = np.zeros(4* self.n)
         
@@ -142,19 +155,23 @@ class ofpEnvs(gym.Env):
         observation_high[1::4] = self.upper_bounds['X']
         observation_high[2::4] = self.upper_bounds['y']
         observation_high[3::4] = self.upper_bounds['x'] 
-            
+        # print(observation_low)
         #Keep a version of this to sample initial states from in reset()
-        self.state_space = spaces.Box(low=observation_low, high=observation_high, dtype = np.uint8) 
+        self.state_space = spaces.Box(low=observation_low, high=observation_high, 
+                                      dtype = np.uint8) 
         
-        
+        # print(self.state_space)
         if self.mode == "rgb_array":
-            self.observation_space = spaces.Box(low = 0, high = 255, shape= (self.plant_Y, self.plant_X, 3), dtype = np.uint8) # Image representation, channel-last for PyTorch CNNs
+            self.observation_space = spaces.Box(low = 0, high = 255, 
+                                                shape= (self.plant_Y, self.plant_X, 3), 
+                                                dtype = np.uint8) # Image representation, channel-last for PyTorch CNNs
 
         elif self.mode == "human":
-            self.observation_space = spaces.Box(low=observation_low, high=observation_high, dtype = np.uint8) # Vector representation of coordinates
+            self.observation_space = spaces.Box(low=observation_low, high=observation_high, 
+                                                dtype =  np.uint8) # Vector representation of coordinates
         else:
             print("Nothing correct selected")
-            
+        # print(self.observation_space)   
         # 5. Set some starting points
         self.reward = 0
         self.state = None # Variable for state being returned to agent
@@ -168,11 +185,15 @@ class ofpEnvs(gym.Env):
     def reset(self):
 
         state_prelim = self.state_space.sample()
+        # print(state_prelim)
+        # print(self.fac_width_y,self.fac_length_x)
         state_prelim[2::4] = self.fac_width_y
         state_prelim[3::4] = self.fac_length_x
-
+        # print(state_prelim)
         i=0
         while self.collision_test(state_prelim) > 0:
+            # print(self.collision_test(state_prelim))
+            # print(state_prelim)
             state_prelim = self.state_space.sample()
             state_prelim[2::4] = self.fac_width_y
             state_prelim[3::4] = self.fac_length_x
@@ -180,7 +201,7 @@ class ofpEnvs(gym.Env):
             if i > 1000:
                 break
         
-        
+        # print(state_prelim)
         # Create fixed positions for reset:
         Y = np.floor(np.outer(np.array([0,0.25,0.5,0.75,1]),self.upper_bounds['Y']))
         X = np.floor(np.outer([0, 1/3, 2/3, 1],self.upper_bounds['X']))
@@ -241,7 +262,8 @@ class ofpEnvs(gym.Env):
         self.D = getDistances(state_prelim[1::4], state_prelim[0::4])
         mhc, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))
         self.last_cost = mhc
-        
+        # print(self.state)
+        # print("hi")
         return np.array(self.state)
     
     def collision_test(self, state):
@@ -264,15 +286,20 @@ class ofpEnvs(gym.Env):
         return collisions
     
     def step(self, action):        
-        m = np.int(np.ceil((action+1)/4))   # Facility on which the action is
+        # m = np.int(np.ceil((action+1)/4))   # Facility on which the action is
+        # m = int(np.floor(action[0])) # expt 1 and 2
+        
+        # print(m)
         step_size = self.step_size       
+        # print(step_size)
         
         temp_state = np.array(self.internal_state) # Get copy of state to manipulate:
         old_state = np.array(self.internal_state)  # Keep copy of state to restore if boundary condition is met       
         done = False
-        
-        # Do the action 
-        # if self.action_list[action] == "S":
+        # print(temp_state)
+        # Do the action expt - 0
+        '''
+                # if self.action_list[action] == "S":
         #     temp_state[4*(m-1)] += step_size
 
         # elif self.action_list[action] == "N": 
@@ -290,32 +317,152 @@ class ofpEnvs(gym.Env):
         # else:
         #     raise ValueError("Received invalid action={} which is not part of the action space".format(action))
         
-        
-        if action[1] < 0:
-            temp_state[4*(m-1)] += action[1]
+        # if action[1] == 0:
+        #     temp_state = temp_state
 
-        elif action[1] >= 0: 
-            temp_state[4*(m-1)] += action[1]
-                
-        else:
-            raise ValueError("Received invalid action={} which is not part of the action space".format(action[1]))        
+        # elif action[1] == 1: #E
+        #     temp_state[4*(m-1)+1] += step_size
+            
+            
+        # elif action[1] == 2: #N
+        #     temp_state[4*(m-1)] -= step_size
+            
+        # elif action[1] == 3: #W
+        #     temp_state[4*(m-1)+1] -= step_size
+            
+            
+        # elif action[1] == 4: #S
+        #     temp_state[4*(m-1)] += step_size                
+        # else:
+        #     raise ValueError("Received invalid action={} which is not part of the action space".format(action[1]))        
+        '''
+        # expt 1
+        '''
+        # if action[1] == 0:
+        #     temp_state = temp_state
+
+        # elif action[1] == 1: #N
+        #     temp_state[4*(m-1)] -= step_size
+            
+            
+        # elif action[1] == 2: #S
+        #     temp_state[4*(m-1)] += step_size
+            
+        # else:
+        #     raise ValueError("Received invalid action={} which is not part of the action space".format(action[1]))
+             
+
+        # if action[2] == 0:
+        #     temp_state = temp_state
         
-        if action[2] < 0:
-            temp_state[4*(m-1)+1] += action[2]
+        # elif action[2] ==1: # E
+        #     temp_state[4*(m-1)+1] += step_size
                       
-        elif action[2] >= 0:
-            temp_state[4*(m-1)+1] += action[2] 
+        # elif action[2] == 2:  # W
+        #     temp_state[4*(m-1)+1] -= step_size
+        
+        # else:
+        #     raise ValueError("Received invalid action={} which is not part of the action space".format(action[2]))
+        ''' 
+        # expt 2
+        '''if action[1]>=0:
+            temp_state[4*(m-1)+1] = action[1]
+
+        else:
+            raise ValueError("Received invalid action={} which is not part of the action space".format(action[1]))
+             
+
+        if action[2]>=0:
+            
+            temp_state[4*(m-1)] = action[2]
         
         else:
             raise ValueError("Received invalid action={} which is not part of the action space".format(action[2]))
+         '''
+        # expt 3
+        '''
+        for i in range(len(action)):
+            m = np.int(np.ceil((i+1)/2)) # expt 3 and 4
+            # print("m = ",m)
+            if i % 2 != 0:
+                if action[i] == 0:
+                    temp_state = temp_state
+                
+                elif action[i] ==1: # N
+                    temp_state[4*(m-1)] -= step_size
+                              
+                elif action[i] == 2:  # S
+                    temp_state[4*(m-1)] += step_size
+                
+                else:
+                    raise ValueError("Received invalid action={} which is not part of the action space".format(action[2]))
+             
+            else:        
+                if action[i] == 0:
+                    temp_state = temp_state
+                
+                elif action[i] ==1: # E
+                    temp_state[4*(m-1)+1] += step_size
+                              
+                elif action[i] == 2:  # W
+                    temp_state[4*(m-1)+1] -= step_size
+                
+                else:
+                    raise ValueError("Received invalid action={} which is not part of the action space".format(action[2]))
+        '''
+        # expt 4
+        # print(action)
+        # print(temp_state)
+        
+        for i in range(0, len(action), 2):
+            m = np.int(np.ceil((i+1)/2)) # expt 3 and 4
+            # print("m = ",m)
+            if action[i] >= 0 and action[i+1] >= 0:
+                temp_state[4*(m-1)] = action[i]
+                temp_state[4*(m-1)+1] = action[i+1]
+            else:
+                raise ValueError("Received invalid action={} which is not part of the action space".format(action[2]))
+        
+        # print("temp",temp_state)
+        
+        '''
+        for i in range(len(action)):
+            m = i+1 # expt 4
+            if action[i][0] >= 0:
+                temp_state[4*(m-1)+1] = action[i][0]
+    
+            else:
+                raise ValueError("Received invalid action={} which is not part of the action space".format(action[1]))
+                 
+    
+            if action[i][1] >= 0:
+                
+                temp_state[4*(m-1)] = action[i][1]
+            
+            else:
+                raise ValueError("Received invalid action={} which is not part of the action space".format(action[2]))
+            ''' 
+                    
+        
+        
+        # if action[2] < 0:
+        #     temp_state[4*(m-1)+1] += action[2]
+                      
+        # elif action[2] >= 0:
+        #     temp_state[4*(m-1)+1] += action[2] 
+        
+        # else:
+        #     raise ValueError("Received invalid action={} which is not part of the action space".format(action[2]))
         # temp_state[4*(m-1)] += step_size
         # print(temp_state)
         
         
         
-        self.D = getDistances(temp_state[1::4], temp_state[0::4])
-        mhc, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))   
         
+        self.D = getDistances(temp_state[1::4], temp_state[0::4])
+        # print(temp_state,temp_state[1::4], temp_state[0::4], self.D)
+        mhc, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))   
+        # print( mhc, self.TM)
         
         if not self.state_space.contains(temp_state):
             done = True
@@ -331,7 +478,7 @@ class ofpEnvs(gym.Env):
                 # Make new state for observation
         self.internal_state = np.array(temp_state) # Keep a copy of the vector representation for future steps
         self.state = self.ConvertCoordinatesToState(np.array(self.internal_state)) if self.mode == 'rgb_array' else np.array(self.internal_state)
-        
+        # print(self.internal_state)
                 # Make rewards for observation
         if mhc < self.last_cost:
             self.last_cost = mhc
