@@ -497,7 +497,7 @@ class ofpEnv(gym.Env):
         self.action_list = [action_set[i] for j in range(self.n) for i in range(len(action_set))]
         self.action_space = spaces.Discrete(len(self.action_list)) #5 actions for each facility: left, up, down, right, rotate + idle action across all
 
-        self.action_space = spaces.Box(low=np.array([0, 0, 0]), high=np.array([self.n, ]))
+        #self.action_space = spaces.Box(low=np.array([0, 0, 0]), high=np.array([self.n, ]))
         # 4. Define observation_space for human and rgb_array mode 
         # Formatting for the observation_space:
         # [facility y, facility x, facility width, facility length] --> [self.fac_y, self.fac_x, self.fac_width_y, self.fac_length_x]
@@ -517,7 +517,7 @@ class ofpEnv(gym.Env):
                              'y': max(self.fac_width_y),
                              'x': max(self.fac_length_x)}
 
-        self.action_space = spaces.Box(low=np.array([0, 0, 0]), high=np.array([self.n, self.upper_bounds['Y'], self.upper_bounds['X']]),dtype=np.int8)
+        self.action_space = spaces.Box(low=np.array([0, 0, 0]), high=np.array([self.n-1, 25, 25]),dtype=np.int8)
 
         observation_low = np.zeros(4* self.n)
         observation_high = np.zeros(4* self.n)
@@ -533,7 +533,7 @@ class ofpEnv(gym.Env):
         observation_high[3::4] = self.upper_bounds['x'] 
             
         #Keep a version of this to sample initial states from in reset()
-        self.state_space = spaces.Box(low=observation_low, high=observation_high, dtype = np.uint8) 
+        self.state_space = spaces.Box(low=observation_low, high=observation_high)
         
         
         if self.mode == "rgb_array":
@@ -635,9 +635,9 @@ class ofpEnv(gym.Env):
     
     def collision_test(self, state):
 
-        state_greyscale = state[:,:,0]
-        collisions = np.sum(A&B)
-        '''
+        ##state_greyscale = state[:,:,0]
+        ##collisions = np.sum(A&B)
+
         y=state[0::4]
         x=state[1::4]
         w=state[2::4]
@@ -653,17 +653,23 @@ class ofpEnv(gym.Env):
                         y[i]-0.5*w[i] >= y[j]+0.5*w[j]):
                     collisions +=1
                     break
-        '''
         return collisions
     
     def step(self, action):        
-        m = np.int(np.ceil((action+1)/4))   # Facility on which the action is
+
+
+        #m = np.int(np.ceil((action+1)/4))   # Facility on which the action is
         step_size = self.step_size       
-        
+        print(action)
         temp_state = np.array(self.internal_state) # Get copy of state to manipulate:
         old_state = np.array(self.internal_state)  # Keep copy of state to restore if boundary condition is met       
         done = False
-        
+
+        print(self.action_space)
+
+        temp_state[4*action[0]]=action[1]
+        temp_state[4 * action[0]+1] = action[2]
+        '''
         # Do the action 
         if self.action_list[action] == "S":
             temp_state[4*(m-1)] += step_size
@@ -682,7 +688,8 @@ class ofpEnv(gym.Env):
         
         else:
             raise ValueError("Received invalid action={} which is not part of the action space".format(action))
-        
+        '''
+
         self.D = getDistances(temp_state[1::4], temp_state[0::4])
         mhc, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))   
         
