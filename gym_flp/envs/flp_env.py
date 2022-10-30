@@ -1,25 +1,23 @@
-import math
-import os
-import pickle
-
-import anytree
-import gym
-import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image
-from anytree import Node
+import gym
 from gym import spaces
 from numpy.random import default_rng
-
+import pickle
+import os
+import math
+import matplotlib.pyplot as plt
+from PIL import Image
 from gym_flp import rewards
-
+from IPython.display import display, clear_output
+import anytree
+from anytree import Node, RenderTree, PreOrderIter, LevelOrderIter, LevelOrderGroupIter
 
 class qapEnv(gym.Env):
     metadata = {'render.modes': ['rgb_array', 'human']}  
 
     def __init__(self, mode=None, instance=None):
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-        self.DistanceMatrices, self.FlowMatrices = pickle.load(open(os.path.join(__location__,'discrete', 'qap_matrices.pkl'), 'rb'))
+        self.DistanceMatrices, self.FlowMatrices = pickle.load(open(os.path.join(__location__, 'instances/discrete', 'qap_matrices.pkl'), 'rb'))
         self.transport_intensity = None
         self.instance = instance
         self.mode = mode
@@ -152,7 +150,8 @@ class fbsEnv(gym.Env):
     
     def __init__(self, mode=None, instance = None):
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,'continual', 'cont_instances.pkl'), 'rb'))
+        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,
+                                                                                                                            'instances/continual', 'cont_instances.pkl'), 'rb'))
         self.mode = mode
         
         self.instance = instance
@@ -445,13 +444,12 @@ class ofpEnv(gym.Env):
        |       |_|y              |   
        |_________________________|
         
-      2022 update:
-      machine class implemented  
+      
       '''    
     
-    def __init__(self, mode=None, instance=None, distance=None, aspect_ratio=None, step_size=None, greenfield=None):
-        self.mode = mode
-        self.instance = instance 
+    def __init__(self, mode = None, instance = None, distance = None, aspect_ratio = None, step_size = None, greenfield = None):
+        self.mode = mode if mode is not None else 'rgb_array'
+        self.instance = instance if instance is not None else 'P6'
         self.distance = distance
         self.aspect_ratio = 2 if aspect_ratio is None else aspect_ratio
         self.step_size = 1 if step_size is None else step_size
@@ -459,7 +457,8 @@ class ofpEnv(gym.Env):
             
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
         
-        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,'continual', 'cont_instances.pkl'), 'rb'))
+        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,
+                                                                                                                            'instances/continual', 'cont_instances.pkl'), 'rb'))
         
         while not (self.instance in self.FlowMatrices.keys() or self.instance in ['Brewery']):
             print('Available Problem Sets:', self.FlowMatrices.keys())
@@ -483,7 +482,7 @@ class ofpEnv(gym.Env):
             # Design a squared plant layout
             self.plant_X = int(round(math.sqrt(self.plant_area),0)) # We want the plant dimensions to be integers to fit them into an image
             self.plant_Y = self.plant_X 
-        
+
         if self.greenfield:
             self.plant_X = 2*self.plant_X
             self.plant_Y = 2*self.plant_Y
@@ -497,8 +496,8 @@ class ofpEnv(gym.Env):
         action_set = ['N', 'E', 'S', 'W']
         self.action_list = [action_set[i] for j in range(self.n) for i in range(len(action_set))]
         self.action_space = spaces.Discrete(len(self.action_list)) #5 actions for each facility: left, up, down, right, rotate + idle action across all
-        #self.action_space = spaces.Box(low=np.array([0, max(self.fac_width_y)/2, max(self.fac_length_x)/2]), high = np.array([self.n, self.plant_Y - max(self.fac_width_y)/2, self.plant_X - max(self.fac_length_x)/2 ]), dtype=np.int8)
-        
+
+        #self.action_space = spaces.Box(low=np.array([0, 0, 0]), high=np.array([self.n, ]))
         # 4. Define observation_space for human and rgb_array mode 
         # Formatting for the observation_space:
         # [facility y, facility x, facility width, facility length] --> [self.fac_y, self.fac_x, self.fac_width_y, self.fac_length_x]
@@ -517,7 +516,9 @@ class ofpEnv(gym.Env):
                              'X': self.plant_X - max(self.fac_length_x),
                              'y': max(self.fac_width_y),
                              'x': max(self.fac_length_x)}
-        
+
+        self.action_space = spaces.Box(low=np.array([0, 0, 0]), high=np.array([self.n-1, 25, 25]),dtype=np.int8)
+
         observation_low = np.zeros(4* self.n)
         observation_high = np.zeros(4* self.n)
         
@@ -532,9 +533,17 @@ class ofpEnv(gym.Env):
         observation_high[3::4] = self.upper_bounds['x'] 
             
         #Keep a version of this to sample initial states from in reset()
-        self.state_space = spaces.Box(low=observation_low, high=observation_high, dtype = np.uint8) 
-        self.observation_space = spaces.Box(low = 0, high = 255, shape= (self.plant_Y, self.plant_X, 3), dtype = np.uint8) # Image representation, channel-last for PyTorch CNNs
+        self.state_space = spaces.Box(low=observation_low, high=observation_high)
+        
+        
+        if self.mode == "rgb_array":
+            self.observation_space = spaces.Box(low = 0, high = 255, shape= (self.plant_Y, self.plant_X, 3), dtype = np.uint8) # Image representation, channel-last for PyTorch CNNs
 
+        elif self.mode == "human":
+            self.observation_space = spaces.Box(low=observation_low, high=observation_high, dtype = np.uint8) # Vector representation of coordinates
+        else:
+            print("Nothing correct selected")
+            
         # 5. Set some starting points
         self.reward = 0
         self.state = None # Variable for state being returned to agent
@@ -562,6 +571,7 @@ class ofpEnv(gym.Env):
         
         
         # Create fixed positions for reset:
+        '''
         Y = np.floor(np.outer(np.array([0,0.25,0.5,0.75,1]),self.upper_bounds['Y']))
         X = np.floor(np.outer([0, 1/3, 2/3, 1],self.upper_bounds['X']))
         
@@ -574,7 +584,6 @@ class ofpEnv(gym.Env):
             state_prelim[1::4] = x_centroids
         
         elif self.n==6:
-            '''
             state_prelim[0]=np.floor(self.upper_bounds['Y'])/2
             state_prelim[1]=np.floor(self.upper_bounds['X'])/2
             state_prelim[4]=np.floor(self.upper_bounds['Y'])-1
@@ -587,7 +596,7 @@ class ofpEnv(gym.Env):
             state_prelim[17]=np.floor(self.upper_bounds['X'])-1
             state_prelim[20]=np.floor(self.lower_bounds['Y'])+1
             state_prelim[21]=np.floor(self.upper_bounds['X'])-1
-            '''
+            
             
             #Shuffle
             #u.re.
@@ -613,7 +622,7 @@ class ofpEnv(gym.Env):
             #o.li.
             state_prelim[20]=np.floor(self.lower_bounds['Y'])+2
             state_prelim[21]=np.floor(self.lower_bounds['X'])+2
-        
+        '''
         self.internal_state = np.array(state_prelim)
         self.state = np.array(self.internal_state) if self.mode == 'human' else self.ConvertCoordinatesToState(self.internal_state)
         self.counter = 0
@@ -625,7 +634,10 @@ class ofpEnv(gym.Env):
         return np.array(self.state)
     
     def collision_test(self, state):
-        
+
+        ##state_greyscale = state[:,:,0]
+        ##collisions = np.sum(A&B)
+
         y=state[0::4]
         x=state[1::4]
         w=state[2::4]
@@ -644,20 +656,20 @@ class ofpEnv(gym.Env):
         return collisions
     
     def step(self, action):        
-        m = np.int(np.ceil((action+1)/4))   # Facility on which the action is
-        step_size = self.step_size
 
-        #m = int(action[0])
-        #print(action[0])
-        
+
+        #m = np.int(np.ceil((action+1)/4))   # Facility on which the action is
+        step_size = self.step_size       
+        print(action)
         temp_state = np.array(self.internal_state) # Get copy of state to manipulate:
         old_state = np.array(self.internal_state)  # Keep copy of state to restore if boundary condition is met       
         done = False
 
-        #temp_state[4*(m-1)] = action[1]
-        #temp_state[4 * (m - 1)+1] = action[2]
+        print(self.action_space)
 
-
+        temp_state[4*action[0]]=action[1]
+        temp_state[4 * action[0]+1] = action[2]
+        '''
         # Do the action 
         if self.action_list[action] == "S":
             temp_state[4*(m-1)] += step_size
@@ -676,7 +688,8 @@ class ofpEnv(gym.Env):
         
         else:
             raise ValueError("Received invalid action={} which is not part of the action space".format(action))
-        
+        '''
+
         self.D = getDistances(temp_state[1::4], temp_state[0::4])
         mhc, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))   
         
@@ -689,10 +702,10 @@ class ofpEnv(gym.Env):
             penalty = 0
 
         # #2 Test if initial state causing a collision. If yes than initialize a new state until there is no collision
-        collisions = self.collision_test(temp_state) # Pass every 4th item starting at 0 (x pos) and 1 (y pos) for checking 
+        collisions = self.collision_test(temp_state) # Pass every 4th item starting at 0 (x pos) and 1 (y pos) for checking
         collision_penalty = -1 if collisions>0 else 0
 
-                # Make new state for observation
+        # Make new state for observation
         self.internal_state = np.array(temp_state) # Keep a copy of the vector representation for future steps
         self.state = self.ConvertCoordinatesToState(np.array(self.internal_state)) if self.mode == 'rgb_array' else np.array(self.internal_state)
         
@@ -748,7 +761,8 @@ class stsEnv(gym.Env):
           
     def __init__(self, mode = None, instance = None):
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,'continual', 'cont_instances.pkl'), 'rb'))
+        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(open(os.path.join(__location__,
+                                                                                                                            'instances/continual', 'cont_instances.pkl'), 'rb'))
         self.instance = instance
         self.mode = mode
         self.MHC = rewards.mhc.MHC() 
@@ -895,15 +909,15 @@ class stsEnv(gym.Env):
                 
                 new_name = None if not len(c)==1 else c[0]
                 
-                Node(name=new_name,
-                     contains=contains,
-                     parent=parent,
-                     area=area,
-                     width=width,
-                     length=length,
-                     upper_left=starting_point,
-                     lower_right=starting_point + np.array([width, length]),
-                     dtype=float)
+                Node(name = new_name, \
+                     contains = contains, \
+                     parent = parent, \
+                     area = area, \
+                     width = width, \
+                     length = length, \
+                     upper_left = starting_point, \
+                     lower_right = starting_point + np.array([width, length]), \
+                     dtype = float)
                 
                 starting_point = starting_point + np.array([0, length]) if parent.name == 'V' else starting_point + np.array([width, 0])
                 
