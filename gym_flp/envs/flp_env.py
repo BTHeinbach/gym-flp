@@ -517,7 +517,7 @@ class ofpEnv(gym.Env):
                              'y': max(self.fac_width_y),
                              'x': max(self.fac_length_x)}
 
-        self.action_space = spaces.Box(low=np.array([0, 0, 0]), high=np.array([self.n-1, 25, 25]),dtype=np.int8)
+        #self.action_space = spaces.Box(low=np.array([0, 0, 0]), high=np.array([self.n-1, 25, 25]),dtype=np.int8)
 
         observation_low = np.zeros(4* self.n)
         observation_high = np.zeros(4* self.n)
@@ -533,14 +533,14 @@ class ofpEnv(gym.Env):
         observation_high[3::4] = self.upper_bounds['x'] 
             
         #Keep a version of this to sample initial states from in reset()
-        self.state_space = spaces.Box(low=observation_low, high=observation_high)
+        self.state_space = spaces.Box(low=observation_low, high=observation_high, dtype=np.uint8)
         
         
         if self.mode == "rgb_array":
-            self.observation_space = spaces.Box(low = 0, high = 255, shape= (self.plant_Y, self.plant_X, 3), dtype = np.uint8) # Image representation, channel-last for PyTorch CNNs
+            self.observation_space = spaces.Box(low=0, high=255, shape=(self.plant_Y, self.plant_X, 3), dtype=np.uint8)# Image representation, channel-last for PyTorch CNNs
 
         elif self.mode == "human":
-            self.observation_space = spaces.Box(low=observation_low, high=observation_high, dtype = np.uint8) # Vector representation of coordinates
+            self.observation_space = spaces.Box(low=observation_low, high=observation_high, dtype=np.uint8) # Vector representation of coordinates
         else:
             print("Nothing correct selected")
             
@@ -634,31 +634,30 @@ class ofpEnv(gym.Env):
         return np.array(self.state)
     
     def collision_test(self, state):
+        collisions = []
+        n = int(len(state)/4)
+        y, x, h, b = state[0::4], state[1::4], state[2::4], state[3::4]
+        mask = np.ones(n, dtype=bool)
 
-        ##state_greyscale = state[:,:,0]
-        ##collisions = np.sum(A&B)
+        for i in range(n):
+            A = np.zeros((self.plant_Y, self.plant_X), dtype=np.uint8)
+            B = np.zeros((self.plant_Y, self.plant_X), dtype=np.uint8)
 
-        y=state[0::4]
-        x=state[1::4]
-        w=state[2::4]
-        l=state[3::4]
-        
-        collisions = 0
-        
-        for i in range(0,self.n-1):
-            for j in range(i+1, self.n):
-                if not (x[i]+0.5*l[i] <= x[j]-0.5*l[j] or 
-                        x[i]-0.5*l[i] >= x[j]+0.5*l[j] or
-                        y[i]+0.5*w[i] <= y[j]-0.5*w[j] or
-                        y[i]-0.5*w[i] >= y[j]+0.5*w[j]):
-                    collisions +=1
-                    break
-        return collisions
+            A[y[i]:y[i]+h[i], x[i]:x[i]+b[i]] = 255
+
+            mask[i] = False
+            y_, x_, h_, b_ = y[mask], x[mask], h[mask], b[mask]
+
+            for j in range(n-1):
+                B[y_[j]:y_[j]+h_[j], x_[j]:x_[j]+b_[j]] = 255
+
+            collisions.append(np.sum(A&B))
+        return np.sum(collisions)
     
     def step(self, action):        
 
 
-        #m = np.int(np.ceil((action+1)/4))   # Facility on which the action is
+        m = np.int(np.ceil((action+1)/4))   # Facility on which the action is
         step_size = self.step_size       
         print(action)
         temp_state = np.array(self.internal_state) # Get copy of state to manipulate:
@@ -667,9 +666,9 @@ class ofpEnv(gym.Env):
 
         print(self.action_space)
 
-        temp_state[4*action[0]]=action[1]
-        temp_state[4 * action[0]+1] = action[2]
-        '''
+        #temp_state[4*action[0]]=action[1]
+        #temp_state[4 * action[0]+1] = action[2]
+
         # Do the action 
         if self.action_list[action] == "S":
             temp_state[4*(m-1)] += step_size
@@ -688,7 +687,7 @@ class ofpEnv(gym.Env):
         
         else:
             raise ValueError("Received invalid action={} which is not part of the action space".format(action))
-        '''
+
 
         self.D = getDistances(temp_state[1::4], temp_state[0::4])
         mhc, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))   
@@ -732,20 +731,20 @@ class ofpEnv(gym.Env):
         sources = np.sum(self.F, axis = 1)
         sinks = np.sum(self.F, axis = 0)
         
-        p = np.arange(self.n)
+        p = np.arange(len(state_prelim)/4)
         
         #R = np.array((p-np.min(p))/(np.max(p)-np.min(p))*255).astype(int)
         R = np.ones(shape=(self.n,)).astype(int)*255
         G = np.array((sources-np.min(sources))/(np.max(sources)-np.min(sources))*255).astype(int)
         B = np.array((sinks-np.min(sinks))/(np.max(sinks)-np.min(sinks))*255).astype(int)
        
-        for x, p in enumerate(p):
+        for x, y in enumerate(p):
             y_from = state_prelim[4*x+0]
             x_from = state_prelim[4*x+1]
             y_to = state_prelim[4*x+0] + state_prelim[4*x+2]
             x_to = state_prelim[4*x+1] + state_prelim[4*x+3]
         
-            data[int(y_from):int(y_to), int(x_from):int(x_to)] = [R[p-1], G[p-1], B[p-1]]
+            data[int(y_from):int(y_to), int(x_from):int(x_to)] = [R[int(y)-1], G[int(y)-1], B[int(y)-1]]
         return np.array(data, dtype=np.uint8)
         
     def render(self, mode = None):       
