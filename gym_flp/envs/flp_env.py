@@ -646,7 +646,7 @@ class OfpEnv(gym.Env):
             state_prelim[21]=np.floor(self.lower_bounds['X'])+2
         '''
         self.internal_state = np.array(state_prelim)
-        self.state = np.array(self.internal_state) if self.mode == 'human' else util.Spaces.make_state_from_coordinates(
+        self.state = np.array(self.internal_state) if self.mode == 'human' else util.preprocessing.Spaces.make_state_from_coordinates(
             self.internal_state)
         self.counter = 0
 
@@ -748,7 +748,7 @@ class OfpEnv(gym.Env):
         return np.array(self.state), reward, done, {'mhc': mhc}
 
     def render(self, mode=None):
-        return Image.fromarray(self.ConvertCoordinatesToState(self.internal_state),
+        return Image.fromarray(util.preprocessing.Spaces.make_image_from_coordinates(self.internal_state),
                                'RGB')  # Convert channel-first back to channel-last for image display
 
     def close(self):

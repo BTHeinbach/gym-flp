@@ -1,11 +1,15 @@
-class Spaces():
+import numpy as np
+
+
+class Spaces:
     def __init__(self):
         self.name = "Test"
 
-    def rescale_actions(self, a: int, b: int, x_min: int, x_max: int, x: float):
+    @staticmethod
+    def rescale_actions(a: int, b: int, x_min: int, x_max: int, x: float):
         return (x-a)*(x_max-x_min)/(b-a)+x_min
 
-    def normalize(self, a:int, b:int, x_min: int, x_max: int, x:float):
+    def normalize(self, a: int, b: int, x_min: int, x_max: int, x: float):
         return (b-a)*(x-x_min)/(x_max-x_min)+a
 
     def make_image_from_coordinates(self, state):
@@ -24,8 +28,8 @@ class Spaces():
         for x, y in enumerate(p):
             y_from = state[4 * x + 0]
             x_from = state[4 * x + 1]
-            y_to = state[4 * x + 0] + state_prelim[4 * x + 2]
-            x_to = state[4 * x + 1] + state_prelim[4 * x + 3]
+            y_to = state[4 * x + 0] + state[4 * x + 2]
+            x_to = state[4 * x + 1] + state[4 * x + 3]
 
             data[int(y_from):int(y_to), int(x_from):int(x_to)] = [R[int(y) - 1], G[int(y) - 1], B[int(y) - 1]]
         return np.array(data, dtype=np.uint8)
