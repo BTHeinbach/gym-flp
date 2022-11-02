@@ -7,10 +7,11 @@ import os
 import math
 import matplotlib.pyplot as plt
 from PIL import Image
-from gym_flp import rewards
+from gym_flp import rewards, util
 from IPython.display import display, clear_output
 import anytree
 from anytree import Node, RenderTree, PreOrderIter, LevelOrderIter, LevelOrderGroupIter
+
 
 class qapEnv(gym.Env):
     metadata = {'render.modes': ['rgb_array', 'human']}  
@@ -706,7 +707,7 @@ class ofpEnv(gym.Env):
 
         # Make new state for observation
         self.internal_state = np.array(temp_state) # Keep a copy of the vector representation for future steps
-        self.state = self.ConvertCoordinatesToState(np.array(self.internal_state)) if self.mode == 'rgb_array' else np.array(self.internal_state)
+        self.state = util.Spaces.make_state_from_coordinates(np.array(self.internal_state)) if self.mode == 'rgb_array' else np.array(self.internal_state)
         
                 # Make rewards for observation
         if mhc < self.last_cost:
@@ -724,29 +725,7 @@ class ofpEnv(gym.Env):
             done = True 
         
         return np.array(self.state), reward, done,  {'mhc': mhc}        
-    
-    def ConvertCoordinatesToState(self, state_prelim):    
-        data = np.zeros((self.plant_Y, self.plant_X, 3),dtype=np.uint8)
-        
-        sources = np.sum(self.F, axis = 1)
-        sinks = np.sum(self.F, axis = 0)
-        
-        p = np.arange(len(state_prelim)/4)
-        
-        #R = np.array((p-np.min(p))/(np.max(p)-np.min(p))*255).astype(int)
-        R = np.ones(shape=(self.n,)).astype(int)*255
-        G = np.array((sources-np.min(sources))/(np.max(sources)-np.min(sources))*255).astype(int)
-        B = np.array((sinks-np.min(sinks))/(np.max(sinks)-np.min(sinks))*255).astype(int)
-       
-        for x, y in enumerate(p):
-            y_from = state_prelim[4*x+0]
-            x_from = state_prelim[4*x+1]
-            y_to = state_prelim[4*x+0] + state_prelim[4*x+2]
-            x_to = state_prelim[4*x+1] + state_prelim[4*x+3]
-        
-            data[int(y_from):int(y_to), int(x_from):int(x_to)] = [R[int(y)-1], G[int(y)-1], B[int(y)-1]]
-        return np.array(data, dtype=np.uint8)
-        
+
     def render(self, mode = None):       
         return Image.fromarray(self.ConvertCoordinatesToState(self.internal_state), 'RGB') #Convert channel-first back to channel-last for image display
         
