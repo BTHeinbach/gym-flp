@@ -460,7 +460,14 @@ class OfpEnv(gym.Env):
       
       '''
 
-    def __init__(self, mode=None, instance=None, distance=None, aspect_ratio=None, step_size=None, greenfield=None):
+    def __init__(self,
+                 mode=None,
+                 instance=None,
+                 distance=None,
+                 aspect_ratio=None,
+                 step_size=None,
+                 greenfield=None,
+                 aspace="discrete"):
         self.mode = mode if mode is not None else 'rgb_array'
         self.instance = instance if instance is not None else 'P6'
         self.distance = distance
@@ -514,12 +521,8 @@ class OfpEnv(gym.Env):
         self.min_width = self.min_side_length * self.aspect_ratio
 
         # 3. Define the possible actions: 5 for each box
-        action_set = ['N', 'E', 'S', 'W']
-        self.action_list = [action_set[i] for j in range(self.n) for i in range(len(action_set))]
-        self.action_space = spaces.Discrete(
-            len(self.action_list))
+        self.action_space = util.preprocessing.build_action_space(aspace, self.n)
 
-        # self.action_space = spaces.Box(low=np.array([0, 0, 0]), high=np.array([self.n, ]))
         # 4. Define observation_space for human and rgb_array mode 
         # Formatting for the observation_space:
         # [facility y, facility x, facility width, facility length] -->
@@ -538,8 +541,6 @@ class OfpEnv(gym.Env):
                              'X': self.plant_X - max(self.fac_length_x),
                              'y': max(self.fac_width_y),
                              'x': max(self.fac_length_x)}
-
-        # self.action_space = spaces.Box(low=np.array([0, 0, 0]), high=np.array([self.n-1, 25, 25]),dtype=np.int8)
 
         observation_low = np.zeros(4 * self.n)
         observation_high = np.zeros(4 * self.n)
@@ -576,6 +577,7 @@ class OfpEnv(gym.Env):
         self.best_reward = None
         self.reset_counter = 0
         self.MHC = rewards.mhc.MHC()
+        self.empty = np.zeros((self.plant_Y, self.plant_X, 3), dtype=np.uint8)
 
     def reset(self):
 
@@ -646,8 +648,10 @@ class OfpEnv(gym.Env):
             state_prelim[21]=np.floor(self.lower_bounds['X'])+2
         '''
         self.internal_state = np.array(state_prelim)
-        self.state = np.array(self.internal_state) if self.mode == 'human' else util.preprocessing.Spaces.make_state_from_coordinates(
-            self.internal_state)
+        self.state = np.array(self.internal_state) if self.mode == 'human' else util.preprocessing.make_state_from_coordinates(
+            coordinates=self.internal_state,
+            canvas=self.empty,
+            flows=self.F)
         self.counter = 0
 
         self.D = getDistances(state_prelim[1::4], state_prelim[0::4])
@@ -679,13 +683,19 @@ class OfpEnv(gym.Env):
 
     def step(self, action):
 
-        m = np.int(np.ceil((action + 1) / 4))  # Facility on which the action is
         step_size = self.step_size
-        print(action)
         temp_state = np.array(self.internal_state)  # Get copy of state to manipulate:
-        old_state = np.array(self.internal_state)  # Keep copy of state to restore if boundary condition is met       
+        old_state = np.array(self.internal_state)  # Keep copy of state to restore if boundary condition is met
         done = False
 
+        # Disassemble action
+        if isinstance(self.action_space, gym.spaces.Discrete):
+            m = np.int(np.ceil((action + 1) / 4))  # Facility on which the action is
+
+        elif isinstance(self.action_space, gym.spaces.MultiDiscrete):
+            for i in range(action.shape[0]):
+                # Check modolo of action to determine whether it's N/E/S/W
+                pass
         # Do the action 
         if self.action_list[action] == "S":
             temp_state[4 * (m - 1)] += step_size
