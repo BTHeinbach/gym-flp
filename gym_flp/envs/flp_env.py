@@ -671,7 +671,7 @@ class OfpEnv(gym.Env):
             mask[i] = False
             y_, x_, h_, b_ = y[mask], x[mask], h[mask], b[mask]
 
-            for j in range(n - 1):
+            for j in range(len(y_)):
                 B[y_[j]:y_[j] + h_[j], x_[j]:x_[j] + b_[j]] = 255
 
             collisions.append(np.sum(A & B))
@@ -685,11 +685,6 @@ class OfpEnv(gym.Env):
         temp_state = np.array(self.internal_state)  # Get copy of state to manipulate:
         old_state = np.array(self.internal_state)  # Keep copy of state to restore if boundary condition is met       
         done = False
-
-        print(self.action_space)
-
-        # temp_state[4*action[0]]=action[1]
-        # temp_state[4 * action[0]+1] = action[2]
 
         # Do the action 
         if self.action_list[action] == "S":
@@ -727,8 +722,10 @@ class OfpEnv(gym.Env):
 
         # Make new state for observation
         self.internal_state = np.array(temp_state)  # Keep a copy of the vector representation for future steps
-        self.state = util.Spaces.make_state_from_coordinates(
-            np.array(self.internal_state)) if self.mode == 'rgb_array' else np.array(self.internal_state)
+        self.state = util.make_state_from_coordinates(
+            coordinates=np.array(self.internal_state),
+            canvas=np.zeros((self.plant_Y, self.plant_X, 3), dtype=np.uint8),
+            flows=self.F) if self.mode == 'rgb_array' else np.array(self.internal_state)
 
         # Make rewards for observation
         if mhc < self.last_cost:
@@ -748,7 +745,9 @@ class OfpEnv(gym.Env):
         return np.array(self.state), reward, done, {'mhc': mhc}
 
     def render(self, mode=None):
-        return Image.fromarray(util.preprocessing.Spaces.make_image_from_coordinates(self.internal_state),
+        return Image.fromarray(util.preprocessing.make_image_from_coordinates(coordinates=self.internal_state,
+                                                                              canvas=np.zeros((self.plant_Y, self.plant_X, 3), dtype=np.uint8),
+                                                                              flows=self.F),
                                'RGB')  # Convert channel-first back to channel-last for image display
 
     def close(self):
