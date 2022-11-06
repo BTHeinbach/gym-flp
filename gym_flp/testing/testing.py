@@ -2,7 +2,7 @@ import gym
 import gym_flp
 
 
-env = gym.make('ofp-v0', mode='human', instance='P6', aspace='multi-discrete')
+env = gym.make('ofp-v0', mode='human', instance='P6', aspace='box')
 env.reset()
-print(env.action_space.shape)
-env.step(env.action_space.sample())
+s, r, d, i = env.step(env.action_space.sample())
+print(s,r,d,i)

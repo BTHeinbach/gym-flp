@@ -27,17 +27,19 @@ def make_image_from_coordinates(coordinates:np.array, canvas:np.array, flows:np.
         canvas[int(y_from):int(y_to), int(x_from):int(x_to)] = [R[int(y) - 1], G[int(y) - 1], B[int(y) - 1]]
     return np.array(canvas, dtype=np.uint8)
 
-def build_action_space(space_type, n):
+def build_action_space(env, space_type, n):
     if space_type == "discrete":
         action_set = ['N', 'E', 'S', 'W']
-        action_list = [action_set[i] for j in range(n) for i in range(len(action_set))]
+        action_list = [action_set[i] for j in range(env.n) for i in range(len(action_set))]
         action_space = spaces.Discrete(len(action_list))
 
     elif space_type == "multi-discrete":
-        action_space = spaces.MultiDiscrete([4 for _ in range(n)])
+        action_space = spaces.MultiDiscrete([5 for _ in range(env.n)])
 
     elif space_type == "box":
-        pass
+        action_space = spaces.Box(low=np.array([0 for _ in range(env.n*2)]),
+                                  high=np.tile([env.plant_Y, env.plant_X], reps=6),
+                                  dtype=np.uint8)
     else:
 
         print("No action space selected or selected space not supported")

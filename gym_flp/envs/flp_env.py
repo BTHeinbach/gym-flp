@@ -521,7 +521,7 @@ class OfpEnv(gym.Env):
         self.min_width = self.min_side_length * self.aspect_ratio
 
         # 3. Define the possible actions: 5 for each box
-        self.action_space = util.preprocessing.build_action_space(aspace, self.n)
+        self.action_space = util.preprocessing.build_action_space(self, aspace, self.n)
 
         # 4. Define observation_space for human and rgb_array mode 
         # Formatting for the observation_space:
@@ -690,27 +690,36 @@ class OfpEnv(gym.Env):
 
         # Disassemble action
         if isinstance(self.action_space, gym.spaces.Discrete):
-            m = np.int(np.ceil((action + 1) / 4))  # Facility on which the action is
+            i = np.int(np.ceil((action + 1) / 4))  # Facility on which the action is
+
+            match action%4:
+                case 0:
+                    temp_state[4 * i] += step_size
+                case 1:
+                    temp_state[4 * i + 1] += step_size
+                case 2:
+                    temp_state[4 * i] -= step_size
+                case 3:
+                    temp_state[4 * i + 1] -= step_size
 
         elif isinstance(self.action_space, gym.spaces.MultiDiscrete):
-            for i in range(action.shape[0]):
-                # Check modolo of action to determine whether it's N/E/S/W
-                pass
-        # Do the action 
-        if self.action_list[action] == "S":
-            temp_state[4 * (m - 1)] += step_size
+            for i in range(0, action.shape[0], 2):
+                match action[i]:
+                    case 0:
+                        temp_state[4 * i] += step_size
+                    case 1:
+                        temp_state[4 * i + 1] += step_size
+                    case 2:
+                        temp_state[4 * i] -= step_size
+                    case 3:
+                        temp_state[4 * i + 1] -= step_size
+                    case 4:
+                        temp_state=temp_state
 
-        elif self.action_list[action] == "N":
-            temp_state[4 * (m - 1)] -= step_size
-
-        elif self.action_list[action] == "W":
-            temp_state[4 * (m - 1) + 1] -= step_size
-
-        elif self.action_list[action] == "E":
-            temp_state[4 * (m - 1) + 1] += step_size
-
-        elif self.action_list[action] == "keep":
-            temp_state = temp_state
+        elif isinstance(self.action_space, gym.spaces.Box):
+            for i in range(0, self.n):
+                temp_state[4*i]=action[2*i]
+                temp_state[4 * i + 1] = action[2*i+1]
 
         else:
             raise ValueError("Received invalid action={} which is not part of the action space".format(action))
