@@ -38,7 +38,7 @@ def build_action_space(env, space_type, n):
 
     elif space_type == "box":
         action_space = spaces.Box(low=np.array([0 for _ in range(env.n*2)]),
-                                  high=np.tile([env.plant_Y, env.plant_X], reps=6),
+                                  high=np.tile([env.upper_bounds['Y'], env.upper_bounds['X']], reps=6),
                                   dtype=np.uint8)
     else:
 

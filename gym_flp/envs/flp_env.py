@@ -735,9 +735,10 @@ class OfpEnv(gym.Env):
             penalty = 0
 
         # #2 Test if initial state causing a collision. If yes than initialize a new state until there is no collision
-        collisions = self.collision_test(
-            temp_state)  # Pass every 4th item starting at 0 (x pos) and 1 (y pos) for checking
-        collision_penalty = -1 if collisions > 0 else 0
+        #collisions = self.collision_test(
+        #    temp_state)  # Pass every 4th item starting at 0 (x pos) and 1 (y pos) for checking
+        #collision_penalty = -1 if collisions > 0 else 0
+        collision_penalty = 0
 
         # Make new state for observation
         self.internal_state = np.array(temp_state)  # Keep a copy of the vector representation for future steps
