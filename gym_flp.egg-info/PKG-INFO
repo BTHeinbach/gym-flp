@@ -1,0 +1,13 @@
+Metadata-Version: 2.1
+Name: gym-flp
+Version: 0.1.7
+Summary: Implementation of facility layout problems in OpenAI Gym
+Home-page: https://github.com/BTHeinbach/gym-flp
+Author: Benjamin Heinbach
+Author-email: benjamin.heinbach@uni-siegen.de
+License: MIT
+Platform: UNKNOWN
+License-File: LICENSE
+
+UNKNOWN
+
