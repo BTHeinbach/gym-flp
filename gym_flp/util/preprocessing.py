@@ -6,7 +6,7 @@ from gym import spaces
 def rescale_actions(a: int, b: int, x_min: int, x_max: int, x: float):
     return (x-a)*(x_max-x_min)/(b-a)+x_min
 
-def normalize(self, a: int, b: int, x_min: int, x_max: int, x: float):
+def normalize(a: int, b: int, x_min: int, x_max: int, x: float):
     return (b-a)*(x-x_min)/(x_max-x_min)+a
 
 def make_image_from_coordinates(coordinates:np.array, canvas:np.array, flows:np.array) -> np.array:
@@ -37,9 +37,10 @@ def build_action_space(env, space_type, n):
         action_space = spaces.MultiDiscrete([5 for _ in range(env.n)])
 
     elif space_type == "box":
-        action_space = spaces.Box(low=np.array([0 for _ in range(env.n*2)]),
-                                  high=np.tile([env.upper_bounds['Y'], env.upper_bounds['X']], reps=6),
-                                  dtype=np.uint8)
+        action_space = spaces.Box(low=np.array([-1.0 for _ in range(env.n*2)]),
+                                  high=np.array([1.0 for _ in range(env.n*2)]),
+                                  #high=np.tile([env.upper_bounds['Y'], env.upper_bounds['X']], reps=6),
+                                  dtype=np.float)
     else:
 
         print("No action space selected or selected space not supported")

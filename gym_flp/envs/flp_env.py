@@ -10,7 +10,7 @@ from PIL import Image
 from gym_flp import rewards, util
 import anytree
 from anytree import Node
-
+from gym_flp.util import preprocessing
 
 class QapEnv(gym.Env):
     metadata = {'render.modes': ['rgb_array', 'human']}
@@ -521,7 +521,7 @@ class OfpEnv(gym.Env):
         self.min_width = self.min_side_length * self.aspect_ratio
 
         # 3. Define the possible actions: 5 for each box
-        self.action_space = util.preprocessing.build_action_space(self, aspace, self.n)
+
 
         # 4. Define observation_space for human and rgb_array mode 
         # Formatting for the observation_space:
@@ -568,6 +568,8 @@ class OfpEnv(gym.Env):
         else:
             print("Nothing correct selected")
 
+        self.action_space = util.preprocessing.build_action_space(self, aspace, self.n)
+
         # 5. Set some starting points
         self.reward = 0
         self.state = None  # Variable for state being returned to agent
@@ -595,7 +597,7 @@ class OfpEnv(gym.Env):
                 break
 
         # Create fixed positions for reset:
-        '''
+
         Y = np.floor(np.outer(np.array([0,0.25,0.5,0.75,1]),self.upper_bounds['Y']))
         X = np.floor(np.outer([0, 1/3, 2/3, 1],self.upper_bounds['X']))
         
@@ -646,9 +648,9 @@ class OfpEnv(gym.Env):
             #o.li.
             state_prelim[20]=np.floor(self.lower_bounds['Y'])+2
             state_prelim[21]=np.floor(self.lower_bounds['X'])+2
-        '''
+
         self.internal_state = np.array(state_prelim)
-        self.state = np.array(self.internal_state) if self.mode == 'human' else util.preprocessing.make_state_from_coordinates(
+        self.state = np.array(self.internal_state) if self.mode == 'human' else preprocessing.make_image_from_coordinates(
             coordinates=self.internal_state,
             canvas=self.empty,
             flows=self.F)
@@ -687,7 +689,7 @@ class OfpEnv(gym.Env):
         temp_state = np.array(self.internal_state)  # Get copy of state to manipulate:
         old_state = np.array(self.internal_state)  # Keep copy of state to restore if boundary condition is met
         done = False
-
+        # print(action)
         # Disassemble action
         if isinstance(self.action_space, gym.spaces.Discrete):
             i = np.int(np.ceil((action + 1) / 4))  # Facility on which the action is
@@ -718,8 +720,11 @@ class OfpEnv(gym.Env):
 
         elif isinstance(self.action_space, gym.spaces.Box):
             for i in range(0, self.n):
-                temp_state[4*i]=action[2*i]
-                temp_state[4 * i + 1] = action[2*i+1]
+                a_y = round(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['Y'], x_max=self.upper_bounds['Y'], x=action[2*i]), 0).astype(int)
+                a_x = round(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['X'], x_max=self.upper_bounds['X'], x=action[2 * i+1]), 0).astype(int)
+
+                temp_state[4*i] = a_y
+                temp_state[4 * i + 1] = a_x
 
         else:
             raise ValueError("Received invalid action={} which is not part of the action space".format(action))
@@ -735,18 +740,19 @@ class OfpEnv(gym.Env):
             penalty = 0
 
         # #2 Test if initial state causing a collision. If yes than initialize a new state until there is no collision
-        #collisions = self.collision_test(
-        #    temp_state)  # Pass every 4th item starting at 0 (x pos) and 1 (y pos) for checking
-        #collision_penalty = -1 if collisions > 0 else 0
-        collision_penalty = 0
+        collisions = self.collision_test(
+            temp_state)  # Pass every 4th item starting at 0 (x pos) and 1 (y pos) for checking
+        collision_penalty = -1 if collisions > 0 else 0
 
+       # print(self.internal_state)
         # Make new state for observation
         self.internal_state = np.array(temp_state)  # Keep a copy of the vector representation for future steps
-        self.state = util.make_state_from_coordinates(
+        self.state = preprocessing.make_image_from_coordinates(
             coordinates=np.array(self.internal_state),
             canvas=np.zeros((self.plant_Y, self.plant_X, 3), dtype=np.uint8),
             flows=self.F) if self.mode == 'rgb_array' else np.array(self.internal_state)
 
+        #print(self.internal_state)
         # Make rewards for observation
         if mhc < self.last_cost:
             self.last_cost = mhc
@@ -765,7 +771,7 @@ class OfpEnv(gym.Env):
         return np.array(self.state), reward, done, {'mhc': mhc}
 
     def render(self, mode=None):
-        return Image.fromarray(util.preprocessing.make_image_from_coordinates(coordinates=self.internal_state,
+        return Image.fromarray(preprocessing.make_image_from_coordinates(coordinates=self.internal_state,
                                                                               canvas=np.zeros((self.plant_Y, self.plant_X, 3), dtype=np.uint8),
                                                                               flows=self.F),
                                'RGB')  # Convert channel-first back to channel-last for image display
