@@ -1,16 +1,18 @@
 import numpy as np
 import gym
-from gym import spaces
-from numpy.random import default_rng
 import pickle
 import os
 import math
 import matplotlib.pyplot as plt
+import anytree
+
+from gym import spaces
+from numpy.random import default_rng
 from PIL import Image
 from gym_flp import rewards, util
-import anytree
 from anytree import Node
 from gym_flp.util import preprocessing
+
 
 class QapEnv(gym.Env):
     metadata = {'render.modes': ['rgb_array', 'human']}
@@ -588,7 +590,7 @@ class OfpEnv(gym.Env):
         state_prelim[3::4] = self.fac_length_x
 
         i = 0
-        while self.collision_test(state_prelim) > 0:
+        while np.sum(self.collision_test(state_prelim)) > 0:
             state_prelim = self.state_space.sample()
             state_prelim[2::4] = self.fac_width_y
             state_prelim[3::4] = self.fac_length_x
@@ -672,16 +674,16 @@ class OfpEnv(gym.Env):
             A = np.zeros((self.plant_Y, self.plant_X), dtype=np.uint8)
             B = np.zeros((self.plant_Y, self.plant_X), dtype=np.uint8)
 
-            A[y[i]:y[i] + h[i], x[i]:x[i] + b[i]] = 255
+            A[y[i]:y[i] + h[i], x[i]:x[i] + b[i]] = 1
 
             mask[i] = False
             y_, x_, h_, b_ = y[mask], x[mask], h[mask], b[mask]
 
             for j in range(len(y_)):
-                B[y_[j]:y_[j] + h_[j], x_[j]:x_[j] + b_[j]] = 255
+                B[y_[j]:y_[j] + h_[j], x_[j]:x_[j] + b_[j]] = 1
 
             collisions.append(np.sum(A & B))
-        return np.sum(collisions)
+        return collisions
 
     def step(self, action):
 
@@ -689,6 +691,8 @@ class OfpEnv(gym.Env):
         temp_state = np.array(self.internal_state)  # Get copy of state to manipulate:
         old_state = np.array(self.internal_state)  # Keep copy of state to restore if boundary condition is met
         done = False
+        mhcs = []
+
         # print(action)
         # Disassemble action
         if isinstance(self.action_space, gym.spaces.Discrete):
@@ -724,25 +728,33 @@ class OfpEnv(gym.Env):
                 a_x = round(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['X'], x_max=self.upper_bounds['X'], x=action[2 * i+1]), 0).astype(int)
 
                 temp_state[4*i] = a_y
-                temp_state[4 * i + 1] = a_x
+                temp_state[4*i+1] = a_x
+
+                self.D = getDistances(temp_state[1::4], temp_state[0::4])
+                mhc, self.TM = self.MHC.compute(D=self.D, F=self.F, s=np.array(range(1, self.n + 1)))
+
+                mhcs.append(mhc)
 
         else:
             raise ValueError("Received invalid action={} which is not part of the action space".format(action))
 
-        self.D = getDistances(temp_state[1::4], temp_state[0::4])
-        mhc, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1, self.n + 1)))
 
+
+        ''' This part is obsolete for box actions'''
+        '''
         if not self.state_space.contains(temp_state):
             done = True
             penalty = -1
             temp_state = np.array(old_state)
         else:
             penalty = 0
+        '''
+        penalty = 0
 
         # #2 Test if initial state causing a collision. If yes than initialize a new state until there is no collision
         collisions = self.collision_test(
             temp_state)  # Pass every 4th item starting at 0 (x pos) and 1 (y pos) for checking
-        collision_penalty = -1 if collisions > 0 else 0
+        # collision_penalty = -1 if collisions > 0 else 0
 
        # print(self.internal_state)
         # Make new state for observation
@@ -752,23 +764,24 @@ class OfpEnv(gym.Env):
             canvas=np.zeros((self.plant_Y, self.plant_X, 3), dtype=np.uint8),
             flows=self.F) if self.mode == 'rgb_array' else np.array(self.internal_state)
 
-        #print(self.internal_state)
         # Make rewards for observation
-        if mhc < self.last_cost:
-            self.last_cost = mhc
-            self.counter = 0
-            cost_penalty = 1
-        else:
-            self.counter += 1
-            cost_penalty = 0
 
-        reward = penalty + cost_penalty + collision_penalty
+        self.counter +=1 if mhc >= self.last_cost else 0
+        self.last_cost = mhc if mhc < self.last_cost else self.last_cost
+        mhc_penalties = [1 if x < self.last_cost else 0 for x in mhcs]
+        collision_penalties = [1 if x == 0 else -1 for x in collisions]
+
+        reward = sum(mhc_penalties) + sum(collision_penalties)
+
+        # upper bound: 2*(n*1) - lower bound: n*0 + n*-1
+        normalized_reward = util.preprocessing.normalize(a=0, b=1, x_min=-1*self.n, x_max=2*self.n, x=reward)
 
         # Check for terminality for observation
         if self.counter >= self.pseudo_stability:
             done = True
 
-        return np.array(self.state), reward, done, {'mhc': mhc}
+        #print(self.counter, done)
+        return np.array(self.state), normalized_reward, done, {'mhc': mhc}
 
     def render(self, mode=None):
         return Image.fromarray(preprocessing.make_image_from_coordinates(coordinates=self.internal_state,
