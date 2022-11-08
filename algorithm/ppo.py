@@ -59,11 +59,11 @@ for ts in train_steps:
                 tensorboard_log=f'logs/{save_path}', 
                 create_eval_env=False, 
                 policy_kwargs=None, 
-                verbose=1,
+                verbose=5,
                 seed=None, 
                 device='cuda',
                 _init_setup_model=True)
-    model.learn(total_timesteps=ts, callback=eval_callback)
+    model.learn(total_timesteps=ts)
     model.save(f"./models/{save_path}")
     
     #model = PPO.load(f"./models/221015_2201_P6_ppo_rgb_array_ofp_movingavg_nocollisions_1000000")

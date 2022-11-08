@@ -4,9 +4,9 @@ import gym_flp
 
 env = gym.make('ofp-v0', mode='human', instance='P6', aspace='box')
 env.reset()
-for _ in range(10):
+for _ in range(1000):
     a = env.action_space.sample()
     s, r, d, i = env.step(a)
-    print(a, env.internal_state,r,d,i)
+    print(env.counter, d)
     #img = env.render()
     #img.show()
