@@ -469,14 +469,15 @@ class OfpEnv(gym.Env):
                  aspect_ratio=None,
                  step_size=None,
                  greenfield=None,
-                 aspace="discrete"):
+                 aspace="discrete",
+                 multi=False):
         self.mode = mode if mode is not None else 'rgb_array'
         self.instance = instance if instance is not None else 'P6'
         self.distance = distance
         self.aspect_ratio = 2 if aspect_ratio is None else aspect_ratio
         self.step_size = 1 if step_size is None else step_size
         self.greenfield = False if greenfield is None else greenfield
-
+        self.multi = multi
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
         self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(
@@ -570,7 +571,7 @@ class OfpEnv(gym.Env):
         else:
             print("Nothing correct selected")
 
-        self.action_space = util.preprocessing.build_action_space(self, aspace, self.n)
+        self.action_space = util.preprocessing.build_action_space(self, aspace, self.n, multi)
 
         # 5. Set some starting points
         self.reward = 0
@@ -692,7 +693,7 @@ class OfpEnv(gym.Env):
         old_state = np.array(self.internal_state)  # Keep copy of state to restore if boundary condition is met
         done = False
         mhcs = []
-
+        multi = self.multi
         # print(action)
         # Disassemble action
         if isinstance(self.action_space, gym.spaces.Discrete):
@@ -708,8 +709,19 @@ class OfpEnv(gym.Env):
                 case 3:
                     temp_state[4 * i + 1] -= step_size
 
+            self.D = getDistances(temp_state[1::4], temp_state[0::4])
+            mhc, self.TM = self.MHC.compute(D=self.D, F=self.F, s=np.array(range(1, self.n + 1)))
+            mhcs.append(mhc)
+
+            if not self.state_space.contains(temp_state):
+                done = True
+                penalty = -1
+                temp_state = np.array(old_state)
+            else:
+                penalty = 0
+
         elif isinstance(self.action_space, gym.spaces.MultiDiscrete):
-            for i in range(0, action.shape[0], 2):
+            for i in range(0, action.shape[0]):
                 match action[i]:
                     case 0:
                         temp_state[4 * i] += step_size
@@ -720,35 +732,50 @@ class OfpEnv(gym.Env):
                     case 3:
                         temp_state[4 * i + 1] -= step_size
                     case 4:
-                        temp_state=temp_state
-
-        elif isinstance(self.action_space, gym.spaces.Box):
-            for i in range(0, self.n):
-                a_y = round(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['Y'], x_max=self.upper_bounds['Y'], x=action[2*i]), 0).astype(int)
-                a_x = round(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['X'], x_max=self.upper_bounds['X'], x=action[2 * i+1]), 0).astype(int)
-
-                temp_state[4*i] = a_y
-                temp_state[4*i+1] = a_x
+                        temp_state
 
                 self.D = getDistances(temp_state[1::4], temp_state[0::4])
                 mhc, self.TM = self.MHC.compute(D=self.D, F=self.F, s=np.array(range(1, self.n + 1)))
 
                 mhcs.append(mhc)
 
+                if not self.state_space.contains(temp_state):
+                    done = True
+                    penalty = -1
+                    temp_state = np.array(old_state)
+                else:
+                    penalty = 0
+
+        elif isinstance(self.action_space, gym.spaces.Box):
+            if multi:
+                for i in range(0, self.n):
+                    a_y = round(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['Y'], x_max=self.upper_bounds['Y'], x=action[2*i]), 0).astype(int)
+                    a_x = round(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['X'], x_max=self.upper_bounds['X'], x=action[2 * i+1]), 0).astype(int)
+
+                    temp_state[4*i] = a_y
+                    temp_state[4*i+1] = a_x
+
+                    self.D = getDistances(temp_state[1::4], temp_state[0::4])
+                    mhc, self.TM = self.MHC.compute(D=self.D, F=self.F, s=np.array(range(1, self.n + 1)))
+
+                    mhcs.append(mhc)
+            else:
+                i = round(preprocessing.rescale_actions(a=-1, b=1, x_min=0, x_max=self.n-1, x=action[0]), 0).astype(int)
+
+                a_y = round(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['Y'], x_max=self.upper_bounds['Y'], x=action[1]), 0).astype(int)
+                a_x = round(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['X'], x_max=self.upper_bounds['X'], x=action[2]), 0).astype(int)
+
+                temp_state[4*i] = a_y
+                temp_state[4*i+1] = a_x
+
+                self.D = getDistances(temp_state[1::4], temp_state[0::4])
+                mhc, self.TM = self.MHC.compute(D=self.D, F=self.F, s=np.array(range(1, self.n + 1)))
+                mhcs.append(mhc)
+
         else:
             raise ValueError("Received invalid action={} which is not part of the action space".format(action))
 
 
-
-        ''' This part is obsolete for box actions'''
-        '''
-        if not self.state_space.contains(temp_state):
-            done = True
-            penalty = -1
-            temp_state = np.array(old_state)
-        else:
-            penalty = 0
-        '''
         penalty = 0
 
         # #2 Test if initial state causing a collision. If yes than initialize a new state until there is no collision
@@ -781,7 +808,7 @@ class OfpEnv(gym.Env):
             done = True
 
         #print(self.counter, done)
-        return np.array(self.state), normalized_reward, done, {'mhc': mhc}
+        return np.array(self.state), normalized_reward + penalty, done, {'mhc': mhc}
 
     def render(self, mode=None):
         return Image.fromarray(preprocessing.make_image_from_coordinates(coordinates=self.internal_state,
