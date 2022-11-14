@@ -812,7 +812,9 @@ class OfpEnv(gym.Env):
 
         reward = mhc_penalties + collision_penalties
 
-
+        if not self.state_space.contains(temp_state):
+            done = True
+            penalty = -2
 
         # upper bound: 2*(n*1) - lower bound: n*0 + n*-1
         # reward = util.preprocessing.normalize(a=0, b=1, x_min=-10*self.n, x_max=2*self.n, x=reward)
