@@ -18,7 +18,7 @@ environment = 'ofp'
 algo = 'ppo'
 mode = 'rgb_array'
 train_steps = np.append(np.outer(10.0**(np.arange(4, 6)), np.arange(1,10,1)).flatten(), 10**6)
-train_steps = [1e5]
+train_steps = [1e6]
 vec_env = make_vec_env('ofp-v0', env_kwargs={'mode': mode, "instance":instance, "aspace":'discrete', "multi":True}, n_envs=1)
 wrap_env = VecTransposeImage(vec_env)
 
@@ -77,6 +77,7 @@ for ts in train_steps:
     images = []
     gain = 0
     gains = []
+    c = []
     actions = []
     done = False
     while done != True:
@@ -86,8 +87,9 @@ for ts in train_steps:
         obs, reward, done, info = wrap_env.step(action)
         gain += reward
         img =  wrap_env.render(mode='rgb_array')
-        rewards.append(reward)
+        rewards.append(reward[0])
         mhc.append(info[0]['mhc'])
+        c.append(info[0]['collisions'])
         gains.append(gain)
         images.append(img)
     
@@ -100,7 +102,7 @@ for ts in train_steps:
     ax1.plot(rewards)
     ax2.plot(mhc)
     imageio.mimsave(f'gifs/{save_path}_test_env.gif', [np.array(img.resize((200,200),Image.NEAREST)) for i, img in enumerate(images) if i%2 == 0], fps=29)
-    print(mhc)
+    print(mhc, rewards, c)
     vec_eval_env.close()
     del model
 y = np.array([i for i in experiment_results.values()])

@@ -30,7 +30,7 @@ def make_image_from_coordinates(coordinates:np.array, canvas:np.array, flows:np.
 def build_action_space(env, space_type, n, multi):
     if space_type == "discrete":
         if not multi:
-            action_space = spaces.Discrete(4*env.n+1)
+            action_space = spaces.Discrete(4*env.n)
         else:
             action_space = spaces.MultiDiscrete([5 for _ in range(env.n)])
 
