@@ -612,7 +612,7 @@ class OfpEnv(gym.Env):
             state_prelim[0::4] = y_centroids
             state_prelim[1::4] = x_centroids
         
-        elif self.n==6:
+        elif self.n==7:
             state_prelim[0]=np.floor(self.upper_bounds['Y'])/2
             state_prelim[1]=np.floor(self.upper_bounds['X'])/2
             state_prelim[4]=np.floor(self.upper_bounds['Y'])-1
@@ -697,7 +697,7 @@ class OfpEnv(gym.Env):
         # print(action)
         # Disassemble action
         if isinstance(self.action_space, gym.spaces.Discrete):
-            i = np.int(np.ceil((action + 1) / 4))  # Facility on which the action is
+            i = np.int(np.floor(action/ 4))  # Facility on which the action is
 
             match action%4:
                 case 0:
@@ -749,8 +749,8 @@ class OfpEnv(gym.Env):
         elif isinstance(self.action_space, gym.spaces.Box):
             if multi:
                 for i in range(0, self.n):
-                    a_y = round(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['Y'], x_max=self.upper_bounds['Y'], x=action[2*i]), 0).astype(int)
-                    a_x = round(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['X'], x_max=self.upper_bounds['X'], x=action[2 * i+1]), 0).astype(int)
+                    a_y = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['Y'], x_max=self.upper_bounds['Y'], x=action[2*i])).astype(int)
+                    a_x = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['X'], x_max=self.upper_bounds['X'], x=action[2 * i+1])).astype(int)
 
                     temp_state[4*i] = a_y
                     temp_state[4*i+1] = a_x
@@ -760,10 +760,10 @@ class OfpEnv(gym.Env):
 
                     mhcs.append(mhc)
             else:
-                i = round(preprocessing.rescale_actions(a=-1, b=1, x_min=0, x_max=self.n-1, x=action[0]), 0).astype(int)
+                i = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=0, x_max=self.n-1, x=action[0])).astype(int)
 
-                a_y = round(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['Y'], x_max=self.upper_bounds['Y'], x=action[1]), 0).astype(int)
-                a_x = round(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['X'], x_max=self.upper_bounds['X'], x=action[2]), 0).astype(int)
+                a_y = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['Y'], x_max=self.upper_bounds['Y'], x=action[1])).astype(int)
+                a_x = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['X'], x_max=self.upper_bounds['X'], x=action[2])).astype(int)
 
                 temp_state[4*i] = a_y
                 temp_state[4*i+1] = a_x
@@ -793,22 +793,36 @@ class OfpEnv(gym.Env):
 
         # Make rewards for observation
 
-        self.counter +=1 if mhc >= self.last_cost else 0
-        self.last_cost = mhc if mhc < self.last_cost else self.last_cost
-        mhc_penalties = [1 if x < self.last_cost else 0 for x in mhcs]
-        collision_penalties = [1 if x == 0 else -1 for x in collisions]
+        if mhc < self.last_cost:
+            self.last_cost=mhc
+            self.counter = 0
+            mhc_penalties = 1
+        else:
+            self.counter+=1
+            mhc_penalties = 0
 
-        reward = sum(mhc_penalties) + sum(collision_penalties)
+        if np.sum(collisions) == 0:
+            collision_penalties = 0
+        else:
+            collision_penalties = -2
+        #self.counter +=1 if mhc >= self.last_cost else 0
+        #self.last_cost = mhc if mhc < self.last_cost else self.last_cost
+        #mhc_penalties = [1 if x < self.last_cost else 0 for x in mhcs]
+        #collision_penalties = [1 if x == 0 else -1 for x in collisions]
+
+        reward = mhc_penalties + collision_penalties
+
+
 
         # upper bound: 2*(n*1) - lower bound: n*0 + n*-1
-        normalized_reward = util.preprocessing.normalize(a=0, b=1, x_min=-1*self.n, x_max=2*self.n, x=reward)
+        # reward = util.preprocessing.normalize(a=0, b=1, x_min=-10*self.n, x_max=2*self.n, x=reward)
 
         # Check for terminality for observation
         if self.counter >= self.pseudo_stability:
             done = True
 
         #print(self.counter, done)
-        return np.array(self.state), normalized_reward + penalty, done, {'mhc': mhc}
+        return np.array(self.state), reward + penalty, done, {'mhc': mhc, 'collisions': sum(collisions), 'r':reward}
 
     def render(self, mode=None):
         return Image.fromarray(preprocessing.make_image_from_coordinates(coordinates=self.internal_state,
