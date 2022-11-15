@@ -612,7 +612,7 @@ class OfpEnv(gym.Env):
             state_prelim[0::4] = y_centroids
             state_prelim[1::4] = x_centroids
         
-        elif self.n==7:
+        elif self.n==6:
             state_prelim[0]=np.floor(self.upper_bounds['Y'])/2
             state_prelim[1]=np.floor(self.upper_bounds['X'])/2
             state_prelim[4]=np.floor(self.upper_bounds['Y'])-1
@@ -812,7 +812,9 @@ class OfpEnv(gym.Env):
 
         reward = mhc_penalties + collision_penalties
 
-
+        if not self.state_space.contains(temp_state):
+            done = True
+            penalty = -2
 
         # upper bound: 2*(n*1) - lower bound: n*0 + n*-1
         # reward = util.preprocessing.normalize(a=0, b=1, x_min=-10*self.n, x_max=2*self.n, x=reward)
