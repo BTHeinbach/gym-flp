@@ -18,7 +18,7 @@ environment = 'ofp'
 algo = 'ppo'
 mode = 'rgb_array'
 train_steps = np.append(np.outer(10.0**(np.arange(4, 6)), np.arange(1,10,1)).flatten(), 10**6)
-train_steps = [1e6]
+train_steps = [3e5]
 vec_env = make_vec_env('ofp-v0', env_kwargs={'mode': mode, "instance":instance, "aspace":'discrete', "multi":True}, n_envs=1)
 wrap_env = VecTransposeImage(vec_env)
 

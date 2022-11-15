@@ -34,7 +34,7 @@ def build_action_space(env, space_type, n, multi):
         else:
             action_space = spaces.MultiDiscrete([5 for _ in range(env.n)])
 
-    elif space_type == "continuous":
+    elif space_type == "box":
         if multi:
             action_space = spaces.Box(low=np.array([-1.0 for _ in range(env.n*2)]),
                                     high=np.array([1.0 for _ in range(env.n*2)]),

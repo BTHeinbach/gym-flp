@@ -612,7 +612,7 @@ class OfpEnv(gym.Env):
             state_prelim[0::4] = y_centroids
             state_prelim[1::4] = x_centroids
         
-        elif self.n==7:
+        elif self.n==6:
             state_prelim[0]=np.floor(self.upper_bounds['Y'])/2
             state_prelim[1]=np.floor(self.upper_bounds['X'])/2
             state_prelim[4]=np.floor(self.upper_bounds['Y'])-1
