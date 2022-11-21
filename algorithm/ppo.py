@@ -11,18 +11,35 @@ import numpy as np
 from stable_baselines3.common.vec_env import VecEnv, VecTransposeImage, DummyVecEnv
 import imageio
 from PIL import Image
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 instance = 'P6'
 timestamp = datetime.datetime.now().strftime("%y%m%d_%H%M")
 environment = 'ofp'
 algo = 'ppo'
 mode = 'rgb_array'
+aspace = "discrete"
+multi = False
 train_steps = np.append(np.outer(10.0**(np.arange(4, 6)), np.arange(1,10,1)).flatten(), 10**6)
+<<<<<<< Updated upstream
 train_steps = [10e6]
 vec_env = make_vec_env('ofp-v0', env_kwargs={'mode': mode, "instance":instance}, n_envs=1)
 wrap_env = VecTransposeImage(vec_env)
 
 vec_eval_env = make_vec_env('ofp-v0', env_kwargs={'mode': mode, "instance":instance}, n_envs=1)
+=======
+#<<<<<<< Updated upstream
+train_steps = [3e5]
+vec_env = make_vec_env('ofp-v0', env_kwargs={'mode': mode, "instance":instance, "aspace":'discrete', "multi":True}, n_envs=1)
+# =======
+train_steps = [1e6]
+vec_env = make_vec_env('ofp-v0', env_kwargs={'mode': mode, "instance":instance,'aspace':aspace, "multi":multi}, n_envs=1)
+# >>>>>>> Stashed changes
+wrap_env = VecTransposeImage(vec_env)
+
+vec_eval_env = make_vec_env('ofp-v0', env_kwargs={'mode': mode, "instance":instance, 'aspace':aspace, "multi":multi}, n_envs=1)
+>>>>>>> Stashed changes
 wrap_eval_env = VecTransposeImage(vec_eval_env)
 
 experiment_results={}
@@ -30,15 +47,15 @@ experiment_results={}
 for ts in train_steps:
     ts = int(ts)
     #print(ts)
-    save_path = f"{timestamp}_{instance}_{algo}_{mode}_{environment}_movingavg_nocollisions_{ts}"
+    save_path = f"{timestamp}_{instance}_{algo}_{mode}_{environment}_aspace_{aspace}_multi_{multi}_movingavg_nocollisions_{ts}"
     
     eval_callback = EvalCallback(wrap_eval_env , 
-                             best_model_save_path=f'./models/best_model/{save_path}',
-                             log_path='./logs/',
-                             eval_freq=10000,
-                             deterministic=True, 
-                             render=False,
-                             n_eval_episodes = 10)
+                              best_model_save_path=f'./models/best_model/{save_path}',
+                              log_path='./logs/',
+                              eval_freq=10000,
+                              deterministic=True, 
+                              render=False,
+                              n_eval_episodes = 10)  
     
     model = PPO("CnnPolicy", 
                 vec_env, 
@@ -67,6 +84,8 @@ for ts in train_steps:
     model.save(f"./models/{save_path}")
     
     #model = PPO.load(f"./models/221015_2201_P6_ppo_rgb_array_ofp_movingavg_nocollisions_1000000")
+    # model = PPO.load(f"./models/221115_0136_P6_ppo_rgb_array_ofp_movingavg_nocollisions_1000000")
+    
     fig, (ax1,ax2) = plt.subplots(2,1)
     
     obs = wrap_env.reset()
@@ -97,11 +116,16 @@ for ts in train_steps:
     cost_saved_rel = 1-(start_cost/final_cost)
     #print(cost_saved, cost_saved_rel, '%')
     experiment_results[ts]=[cost_saved, cost_saved_rel]
+    #print("rew",len(rewards), rewards, "mhc", len(mhc), mhc)
     ax1.plot(rewards)
     ax2.plot(mhc)
     imageio.mimsave(f'gifs/{save_path}_test_env.gif', [np.array(img.resize((200,200),Image.NEAREST)) for i, img in enumerate(images) if i%2 == 0], fps=29)
     
     vec_eval_env.close()
+    plt.show()
     del model
 y = np.array([i for i in experiment_results.values()])
 plt.plot(train_steps,abs(y[:,0]),)
+plt.show()
+
+

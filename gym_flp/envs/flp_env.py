@@ -460,7 +460,20 @@ class OfpEnv(gym.Env):
       
       '''
 
+<<<<<<< Updated upstream
     def __init__(self, mode=None, instance=None, distance=None, aspect_ratio=None, step_size=None, greenfield=None):
+=======
+    def __init__(self,
+                 mode=None,
+                 instance=None,
+                 distance=None,
+                 aspect_ratio=None,
+                 step_size=None,
+                 greenfield=None,
+                 aspace="discrete",
+                 multi=False):
+        print("new arbeit in D")
+>>>>>>> Stashed changes
         self.mode = mode if mode is not None else 'rgb_array'
         self.instance = instance if instance is not None else 'P6'
         self.distance = distance
