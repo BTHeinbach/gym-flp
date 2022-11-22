@@ -6,24 +6,25 @@ import numpy as np
 #pytest -l testing.py
 
 @pytest.mark.parametrize(
-    "test_action, expected",
+    "test_action, expected, reward_expected",
     [(0, np.array([22, 20,  4,  5,
                     2, 20,  8,  9,
                    11, 10,  5,  6,
                    21,  2,  4,  6,
                    11, 20,  4,  4,
-                    2,  2,  3,  5], dtype=np.uint8)),
+                    2,  2,  3,  5], dtype=np.uint8),0),
      (3, np.array([21, 19,  4,  5,
                     2, 20,  8,  9,
                    11, 10,  5,  6,
                    21,  2,  4,  6,
                    11, 20,  4,  4,
-                    2,  2,  3,  5], dtype=np.uint8)),
+                    2,  2,  3,  5], dtype=np.uint8),1),
      (8, np.array([21, 20,  4,  5,
                     2, 20,  8,  9,
                    12, 10,  5,  6,
                    21,  2,  4,  6,
                    11, 20,  4,  4,
+<<<<<<< Updated upstream
                     2,  2,  3,  5], dtype=np.uint8)),
      (9, np.array([21, 20,  4,  5,
                     2, 20,  8,  9,
@@ -44,27 +45,51 @@ import numpy as np
                     11, 20,  4,  4,
                     2,  1,  3,  5], dtype=np.uint8))])
 def test_discrete(test_action, expected):
+=======
+                    2,  2,  3,  5], dtype=np.uint8),0),
+     (9, np.array([21, 20,  4,  5,
+               2, 20,  8,  9,
+              11, 11,  5,  6,
+              21,  2,  4,  6,
+              11, 20,  4,  4,
+               2,  2,  3,  5], dtype=np.uint8),1),
+        (15, np.array([21, 20,  4,  5,
+                       2, 20,  8,  9,
+                      11, 10,  5,  6,
+                      21,  1,  4,  6,
+                      11, 20,  4,  4,
+                       2,  2,  3,  5], dtype=np.uint8),0),
+         (23, np.array([21, 20,  4,  5,
+                         2, 20,  8,  9,
+                        11, 10,  5,  6,
+                        21,  2,  4,  6,
+                        11, 20,  4,  4,
+                        2,  1,  3,  5], dtype=np.uint8),0)])
+def test_discrete(test_action, expected, reward_expected):
+>>>>>>> Stashed changes
     env = gym.make('ofp-v0', mode='human', instance='P6', aspace='discrete', multi=False)
     env.reset()
     s, r, d, i = env.step(test_action)
     
     assert np.array_equal(s, expected)==True
+    assert r == reward_expected
     assert d == False
 
 
 @pytest.mark.parametrize(
-    "test_action, expected",
+    "test_action, expected, reward_expected",
     [(np.array([0, 0, 0, 0, 0, 0]), np.array([22, 20,  4,  5,
                                                3, 20,  8,  9,
                                               12, 10,  5,  6,
                                               22,  2,  4,  6,
                                               12, 20,  4,  4,
-                                               3,  2,  3,  5], dtype=np.uint8)),
+                                               3,  2,  3,  5], dtype=np.uint8),0),
      (np.array([2, 4, 1, 4, 0, 3]), np.array([20, 20,  4,  5,
                                               2, 20,  8,  9,
                                              11, 11,  5,  6,
                                              21,  2,  4,  6,
                                              12, 20,  4,  4,
+<<<<<<< Updated upstream
                                               2,  1,  3,  5], dtype=np.uint8)),
      (np.array([1, 1, 1, 1, 1, 1]), np.array([21, 21,  4,  5,
                                               2, 21,  8,  9,
@@ -78,25 +103,41 @@ def test_discrete(test_action, expected):
                                              20,  2,  4,  6,
                                              10, 20,  4,  4,
                                               1,  2,  3,  5], dtype=np.uint8)),
+=======
+                                              2,  1,  3,  5], dtype=np.uint8),1),
+     (np.array([1, 1, 1, 1, 1, 1]), np.array([21, 21,  4,  5,
+                                         2, 21,  8,  9,
+                                        11, 11,  5,  6,
+                                        21,  3,  4,  6,
+                                        11, 21,  4,  4,
+                                         2,  3,  3,  5], dtype=np.uint8),0),
+    (np.array([2, 2, 2, 2, 2, 2]), np.array([20, 20,  4,  5,
+                                             1, 20,  8,  9,
+                                            10, 10,  5,  6,
+                                            20,  2,  4,  6,
+                                            10, 20,  4,  4,
+                                             1,  2,  3,  5], dtype=np.uint8),0),
+>>>>>>> Stashed changes
      (np.array([3, 3, 2, 4, 1, 1]), np.array([21, 19,  4,  5,
                                                2, 19,  8,  9,
                                               10, 10,  5,  6,
                                               21,  2,  4,  6,
                                               11, 21,  4,  4,
-                                               2,  3,  3,  5], dtype=np.uint8)),
+                                               2,  3,  3,  5], dtype=np.uint8),1),
      (np.array([4, 4, 4, 4, 4, 4]), np.array([21, 20,  4,  5,
                                               2, 20,  8,  9,
                                              11, 10,  5,  6,
                                              21,  2,  4,  6,
                                              11, 20,  4,  4,
-                                              2,  2,  3,  5], dtype=np.uint8))
+                                              2,  2,  3,  5], dtype=np.uint8),0)
              ])
-def test_multidiscrete(test_action, expected):
+def test_multidiscrete(test_action, expected, reward_expected):
     env = gym.make('ofp-v0', mode='human', instance='P6', aspace='discrete', multi=True)
     env.reset()
     s, r, d, i = env.step(test_action)
 
     assert np.array_equal(s, expected)==True
+    assert r == reward_expected
     assert d == False
 
 @pytest.mark.parametrize(
@@ -119,12 +160,21 @@ def test_multidiscrete(test_action, expected):
                                              21,  2,  4,  6,
                                              11, 20,  4,  4,
                                               2,  2,  3,  5], dtype=np.uint8)),
+<<<<<<< Updated upstream
     (np.array([-0.59, 0, 0]), np.array([21, 20,  4,  5,
                                                11, 10,  8,  9,
                                               11, 10,  5,  6,
                                               21,  2,  4,  6,
                                               11, 20,  4,  4,
                                                2,  2,  3,  5], dtype=np.uint8)),
+=======
+     (np.array([-0.59, 0, 0]), np.array([21, 20,  4,  5,
+                                           11, 10,  8,  9,
+                                          11, 10,  5,  6,
+                                          21,  2,  4,  6,
+                                          11, 20,  4,  4,
+                                           2,  2,  3,  5], dtype=np.uint8)),
+>>>>>>> Stashed changes
     (np.array([-0.6, 0, 0]), np.array([21, 20,  4,  5,
                                                11, 10,  8,  9,
                                               11, 10,  5,  6,
@@ -137,12 +187,21 @@ def test_multidiscrete(test_action, expected):
                                             21,  2,  4,  6,
                                             11, 20,  4,  4,
                                              2,  2,  3,  5], dtype=np.uint8)),
+<<<<<<< Updated upstream
       (np.array([0.2, -0.53, -0.14]), np.array([21, 20,  4,  5,
                                                2, 20,  8,  9,
                                               11, 10,  5,  6,
                                               5,  9,  4,  6,
                                               11, 20,  4,  4,
                                                2,  2,  3,  5], dtype=np.uint8))
+=======
+     (np.array([0.2, -0.53, -0.14]), np.array([21, 20,  4,  5,
+                                              2, 20,  8,  9,
+                                             11, 10,  5,  6,
+                                             5,  9,  4,  6,
+                                             11, 20,  4,  4,
+                                              2,  2,  3,  5], dtype=np.uint8))
+>>>>>>> Stashed changes
              ])
 def test_box(test_action, expected):
     env = gym.make('ofp-v0', mode='human', instance='P6', aspace='box', multi=False)
