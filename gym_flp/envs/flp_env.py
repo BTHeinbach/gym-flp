@@ -578,7 +578,7 @@ class OfpEnv(gym.Env):
         self.state = None  # Variable for state being returned to agent
         self.internal_state = None  # Placeholder for state variable for internal manipulation in rgb_array mode
         self.counter = 0
-        self.pseudo_stability = 50  # If the reward has not improved in the last 100 steps, terminate the episode
+        self.pseudo_stability = 5  # If the reward has not improved in the last x steps, terminate the episode
         self.best_reward = None
         self.reset_counter = 0
         self.MHC = rewards.mhc.MHC()
@@ -709,19 +709,9 @@ class OfpEnv(gym.Env):
                 case 3:
                     temp_state[4 * i + 1] -= step_size
 
-            self.D = getDistances(temp_state[1::4], temp_state[0::4])
-            mhc, self.TM = self.MHC.compute(D=self.D, F=self.F, s=np.array(range(1, self.n + 1)))
-            mhcs.append(mhc)
-
-            if not self.state_space.contains(temp_state):
-                done = True
-                penalty = -1
-                temp_state = np.array(old_state)
-            else:
-                penalty = 0
-
         elif isinstance(self.action_space, gym.spaces.MultiDiscrete):
             for i in range(0, action.shape[0]):
+
                 match action[i]:
                     case 0:
                         temp_state[4 * i] += step_size
@@ -734,18 +724,6 @@ class OfpEnv(gym.Env):
                     case 4:
                         temp_state
 
-                self.D = getDistances(temp_state[1::4], temp_state[0::4])
-                mhc, self.TM = self.MHC.compute(D=self.D, F=self.F, s=np.array(range(1, self.n + 1)))
-
-                mhcs.append(mhc)
-
-                if not self.state_space.contains(temp_state):
-                    done = True
-                    penalty = -1
-                    temp_state = np.array(old_state)
-                else:
-                    penalty = 0
-
         elif isinstance(self.action_space, gym.spaces.Box):
             if multi:
                 for i in range(0, self.n):
@@ -755,10 +733,6 @@ class OfpEnv(gym.Env):
                     temp_state[4*i] = a_y
                     temp_state[4*i+1] = a_x
 
-                    self.D = getDistances(temp_state[1::4], temp_state[0::4])
-                    mhc, self.TM = self.MHC.compute(D=self.D, F=self.F, s=np.array(range(1, self.n + 1)))
-
-                    mhcs.append(mhc)
             else:
                 i = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=0, x_max=self.n-1, x=action[0])).astype(int)
 
@@ -768,15 +742,21 @@ class OfpEnv(gym.Env):
                 temp_state[4*i] = a_y
                 temp_state[4*i+1] = a_x
 
-                self.D = getDistances(temp_state[1::4], temp_state[0::4])
-                mhc, self.TM = self.MHC.compute(D=self.D, F=self.F, s=np.array(range(1, self.n + 1)))
-                mhcs.append(mhc)
-
         else:
             raise ValueError("Received invalid action={} which is not part of the action space".format(action))
 
 
         penalty = 0
+
+        self.D = getDistances(temp_state[1::4], temp_state[0::4])
+        mhc, self.TM = self.MHC.compute(D=self.D, F=self.F, s=np.array(range(1, self.n + 1)))
+
+        if not self.state_space.contains(temp_state):
+            done = True
+            penalty = -1
+            temp_state = np.array(old_state)
+        else:
+            penalty = 0
 
         # #2 Test if initial state causing a collision. If yes than initialize a new state until there is no collision
         collisions = self.collision_test(
@@ -801,6 +781,8 @@ class OfpEnv(gym.Env):
             self.counter+=1
             mhc_penalties = 0
 
+        #self.last_cost = mhc
+
         if np.sum(collisions) == 0:
             collision_penalties = 0
         else:
@@ -812,25 +794,19 @@ class OfpEnv(gym.Env):
 
         reward = mhc_penalties + collision_penalties
 
-        if not self.state_space.contains(temp_state):
-            done = True
-            penalty = -2
-
-        # upper bound: 2*(n*1) - lower bound: n*0 + n*-1
-        # reward = util.preprocessing.normalize(a=0, b=1, x_min=-10*self.n, x_max=2*self.n, x=reward)
-
         # Check for terminality for observation
         if self.counter >= self.pseudo_stability:
+            done = True
+        elif np.sum(collisions)!=0:
             done = True
 
         #print(self.counter, done)
         return np.array(self.state), reward + penalty, done, {'mhc': mhc, 'collisions': sum(collisions), 'r':reward}
 
     def render(self, mode=None):
-        return Image.fromarray(preprocessing.make_image_from_coordinates(coordinates=self.internal_state,
-                                                                              canvas=np.zeros((self.plant_Y, self.plant_X, 3), dtype=np.uint8),
-                                                                              flows=self.F),
-                               'RGB')  # Convert channel-first back to channel-last for image display
+        return preprocessing.make_image_from_coordinates(coordinates=self.internal_state,
+                                                         canvas=np.zeros((self.plant_Y, self.plant_X, 3), dtype=np.uint8),
+                                                         flows=self.F)
 
     def close(self):
         pass

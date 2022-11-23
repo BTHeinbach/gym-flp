@@ -39,9 +39,9 @@ def build_action_space(env, space_type, n, multi):
             action_space = spaces.Box(low=np.array([-1.0 for _ in range(env.n*2)]),
                                     high=np.array([1.0 for _ in range(env.n*2)]),
                                     #high=np.tile([env.upper_bounds['Y'], env.upper_bounds['X']], reps=6),
-                                    dtype=np.float)
+                                    dtype='float32')
         else:
-            action_space = spaces.Box(low=np.array([-1.0, -1.0, -1.0]), high=np.array([1.0, 1.0, 1.0]), dtype=np.float)
+            action_space = spaces.Box(low=np.array([-1.0, -1.0, -1.0]), high=np.array([1.0, 1.0, 1.0]), dtype='float32')
     else:
         print("No action space selected or selected space not supported")
     return action_space

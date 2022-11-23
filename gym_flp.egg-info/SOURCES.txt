@@ -399,9 +399,12 @@ gym_flp/rewards/mhc.py
 gym_flp/testing/__init__.py
 gym_flp/testing/machine_class.py
 gym_flp/testing/machines_json.py
+gym_flp/testing/testing.py
 gym_flp/util/__init__.py
+gym_flp/util/owncloud_upload.py
 gym_flp/util/preprocessing.py
 testing/__init__.py
 testing/unit/__init__.py
+testing/unit/normalization.py
 testing/unit/test_collision.py
 testing/unit/test_rescaling.py

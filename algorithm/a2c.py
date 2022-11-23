@@ -20,12 +20,12 @@ mode = 'rgb_array'
 train_steps = np.append(np.outer(10.0 ** (np.arange(4, 6)), np.arange(1, 10, 1)).flatten(), 10 ** 6)
 train_steps = [1e6]
 vec_env = make_vec_env('ofp-v0',
-                       env_kwargs={'mode': mode, "instance": instance, "aspace": 'discrete', "multi": True},
+                       env_kwargs={'mode': mode, "instance": instance, "aspace": 'discrete', "multi": False},
                        n_envs=1)
 wrap_env = VecTransposeImage(vec_env)
-
+print(wrap_env.action_space.sample())
 vec_eval_env = make_vec_env('ofp-v0',
-                            env_kwargs={'mode': mode, "instance": instance, "aspace": 'discrete', "multi": True},
+                            env_kwargs={'mode': mode, "instance": instance, "aspace": 'discrete', "multi": False},
                             n_envs=1)
 wrap_eval_env = VecTransposeImage(vec_eval_env)
 
@@ -64,7 +64,7 @@ for ts in train_steps:
                 device='auto',
                 _init_setup_model=True,
                 tensorboard_log=f'logs/{save_path}')
-    model.learn(total_timesteps=ts)
+    model.learn(total_timesteps=ts, callback=eval_callback)
     model.save(f"./models/{save_path}")
 
     # model = PPO.load(f"./models/221015_2201_P6_ppo_rgb_array_ofp_movingavg_nocollisions_1000000")

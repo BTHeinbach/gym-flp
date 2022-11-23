@@ -2,4 +2,4 @@ gym
 numpy
 anytree
 pygame
-PIL
+Pillow

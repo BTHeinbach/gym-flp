@@ -18,15 +18,17 @@ timestamp = datetime.datetime.now().strftime("%y%m%d_%H%M")
 environment = 'ofp'
 algo = 'ddpg'
 mode = 'rgb_array'
+multi = True
+aspace = 'box'
 train_steps = np.append(np.outer(10.0 ** (np.arange(4, 6)), np.arange(1, 10, 1)).flatten(), 10 ** 6)
-train_steps = [1e4]
+train_steps = [1e5]
 vec_env = make_vec_env('ofp-v0',
-                       env_kwargs={'mode': mode, "instance": instance, "aspace": 'continuous', "multi": False},
+                       env_kwargs={'mode': mode, "instance": instance, "aspace": aspace, "multi": multi},
                        n_envs=1)
 wrap_env = VecTransposeImage(vec_env)
 
 vec_eval_env = make_vec_env('ofp-v0',
-                            env_kwargs={'mode': mode, "instance": instance, "aspace": 'continuous', "multi": False},
+                            env_kwargs={'mode': mode, "instance": instance, "aspace": aspace, "multi": multi},
                             n_envs=1)
 wrap_eval_env = VecTransposeImage(vec_eval_env)
 
@@ -42,7 +44,7 @@ action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n
 for ts in train_steps:
     ts = int(ts)
     # print(ts)
-    save_path = f"{timestamp}_{instance}_{algo}_{mode}_{environment}_movingavg_nocollisions_{ts}"
+    save_path = f"{timestamp}_{instance}_{algo}_{mode}_{aspace}_multi-{multi}_{ts}"
 
     eval_callback = EvalCallback(wrap_eval_env,
                                  best_model_save_path=f'./models/best_model/{save_path}',
@@ -79,7 +81,7 @@ for ts in train_steps:
     fig, (ax1, ax2) = plt.subplots(2, 1)
 
     obs = wrap_env.reset()
-    start_cost = wrap_env.last_cost
+    start_cost = wrap_env.get_attr("last_cost")[0]
 
     rewards = []
     mhc = []
@@ -95,9 +97,9 @@ for ts in train_steps:
         obs, reward, done, info = wrap_env.step(action)
         gain += reward
         img = wrap_env.render(mode='rgb_array')
-        rewards.append(reward)
-        mhc.append(info['mhc'])
-        c.append(info['collisions'])
+        rewards.append(reward[0])
+        mhc.append(info[0]['mhc'])
+        c.append(info[0]['collisions'])
         gains.append(gain)
         images.append(img)
 
@@ -113,7 +115,7 @@ for ts in train_steps:
                     [np.array(img.resize((200, 200), Image.NEAREST)) for i, img in enumerate(images) if i % 2 == 0],
                     fps=29)
     print(mhc, rewards, c)
-    wrap_env.close()
+    vec_eval_env.close()
     del model
 y = np.array([i for i in experiment_results.values()])
 plt.plot(train_steps, abs(y[:, 0]), )
