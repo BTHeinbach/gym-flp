@@ -74,7 +74,7 @@ class VideoRecorderCallback(BaseCallback):
             )
             screens_array = np.array(screens)
             self.logger.record(
-                "trajectory/video",
+                f"trajectory/video",
                 Video(th.ByteTensor([screens_array]), fps=20),
                 exclude=("stdout", "log", "json", "csv"),
             )
@@ -85,13 +85,13 @@ timestamp = datetime.datetime.now().strftime("%y%m%d_%H%M")
 environment = 'ofp'
 algo = 'ppo'
 mode = 'rgb_array'
-train_steps = [1e5]
+train_steps = [2e6]
 vec_env = make_vec_env('ofp-v0',
-                       env_kwargs={'mode': mode, "instance": instance, "aspace": 'discrete', "multi": False},
+                       env_kwargs={'mode': mode, "instance": instance, "aspace": 'discrete', "multi": True},
                        n_envs=1)
 
 vec_eval_env = make_vec_env('ofp-v0',
-                            env_kwargs={'mode': mode, "instance": instance, "aspace": 'discrete', "multi": False},
+                            env_kwargs={'mode': mode, "instance": instance, "aspace": 'discrete', "multi": True},
                             n_envs=1)
 
 wrap_env = VecTransposeImage(vec_env)
@@ -132,7 +132,7 @@ for ts in train_steps:
                                  deterministic=True,
                                  render=False)
 
-    model.learn(total_timesteps=ts, callback=video_recorder)
+    model.learn(total_timesteps=ts)
     model.save(f"./models/{save_path}")
     
     # model = PPO.load(f"./models/221015_2201_P6_ppo_rgb_array_ofp_movingavg_nocollisions_1000000")
@@ -151,11 +151,12 @@ for ts in train_steps:
     done = False
 
     eval_steps = 1000
-    for _ in eval_steps:
+    while not done:
+        #for _ in range(eval_steps):
         action, _states = model.predict(obs, deterministic=True)
         actions.append(action)
         obs, reward, done, info = wrap_env.step(action)
-        img = wrap_env.render(mode='rgb_array')
+        img = Image.fromarray(wrap_env.render(mode='rgb_array'))
         rewards.append(reward[0])
         mhc.append(info[0]['mhc'])
         c.append(info[0]['collisions'])
