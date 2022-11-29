@@ -119,7 +119,7 @@ for ts in train_steps:
                 create_eval_env=False, 
                 policy_kwargs=None, 
                 verbose=1,
-                seed=42, 
+                seed=42  , 
                 device='cuda',
                 _init_setup_model=True)
     video_recorder = VideoRecorderCallback(wrap_eval_env, render_freq=5)
@@ -130,10 +130,10 @@ for ts in train_steps:
                                  deterministic=True,
                                  render=False)
 
-    model.learn(total_timesteps=ts)
-    model.save(f"./models/{save_path}")
+    # model.learn(total_timesteps=ts)
+    # model.save(f"./models/{save_path}")
     
-    # model = PPO.load(f"./models/221127_0836_P6_ppo_rgb_array_ofp_box_False_movingavg_nocollisions_1000000")
+    model = PPO.load(f"./models/221127_1441_P6_ppo_rgb_array_ofp_box_False_movingavg_nocollisions_500000")
     fig, (ax1, ax2) = plt.subplots(2, 1)
     
     obs = wrap_env.reset()
@@ -148,7 +148,7 @@ for ts in train_steps:
     actions = []
     done = False
 
-    eval_steps = 1000
+    eval_steps = 50
     while not done:
         #for _ in range(eval_steps):
         action, _states = model.predict(obs, deterministic=True)
