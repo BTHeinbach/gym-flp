@@ -797,8 +797,8 @@ class OfpEnv(gym.Env):
         # Check for terminality for observation
         if self.counter >= self.pseudo_stability:
             done = True
-        elif np.sum(collisions)!=0:
-            done = True
+        #elif np.sum(collisions)!=0:
+        #    done = True
 
         #print(self.counter, done)
         return np.array(self.state), reward + penalty, done, {'mhc': mhc, 'collisions': sum(collisions), 'r':reward}
