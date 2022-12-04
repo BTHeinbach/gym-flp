@@ -9,7 +9,7 @@ import torch as th
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.callbacks import EvalCallback, BaseCallback
+from stable_baselines3.common.callbacks import EvalCallback, BaseCallback, StopTrainingOnNoModelImprovement
 from stable_baselines3.common.vec_env import VecTransposeImage
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import Video
@@ -80,26 +80,37 @@ class VideoRecorderCallback(BaseCallback):
             )
         return True
 
+stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=3, min_evals=5, verbose=1)
+
 instance = 'P6'
 timestamp = datetime.datetime.now().strftime("%y%m%d_%H%M")
 environment = 'ofp'
 algo = 'ppo'
 mode = 'rgb_array'
-train_steps = [2e6]
+train_steps = [5e4]
+aspace = 'discrete'
+multi = False
 vec_env = make_vec_env('ofp-v0',
-                       env_kwargs={'mode': mode, "instance": instance, "aspace": 'discrete', "multi": True},
+                       env_kwargs={'mode': mode, "instance": instance, "aspace": aspace, "multi": multi},
                        n_envs=1)
 
 vec_eval_env = make_vec_env('ofp-v0',
-                            env_kwargs={'mode': mode, "instance": instance, "aspace": 'discrete', "multi": True},
+                            env_kwargs={'mode': mode, "instance": instance, "aspace": aspace, "multi": multi},
+                            n_envs=1)
+
+vec_test_env = make_vec_env('ofp-v0',
+                            env_kwargs={'mode': mode, "instance": instance, "aspace": aspace, "multi": multi},
                             n_envs=1)
 
 wrap_env = VecTransposeImage(vec_env)
 wrap_eval_env = VecTransposeImage(vec_eval_env)
+test_env_final = VecTransposeImage(vec_test_env)
+test_env_best = VecTransposeImage(vec_test_env)
+
 
 for ts in train_steps:
     ts = int(ts)
-    save_path = f"{timestamp}_{instance}_{algo}_{mode}_{environment}_movingavg_nocollisions_{ts}"
+    save_path = f"{timestamp}_{instance}_{algo}_{mode}_{environment}_{aspace}_multi_{multi}_{ts}"
 
     model = PPO("CnnPolicy", 
                 wrap_env,
@@ -128,52 +139,77 @@ for ts in train_steps:
     eval_callback = EvalCallback(wrap_eval_env,
                                  best_model_save_path=f'./models/best_model/{save_path}',
                                  log_path='./logs/',
-                                 eval_freq=10000,
+                                 eval_freq=1000,
                                  deterministic=True,
-                                 render=False)
+                                 render=False,
+                                 callback_after_eval=stop_train_callback)
 
-    model.learn(total_timesteps=ts)
+    model.learn(total_timesteps=ts, callback=eval_callback, progress_bar=True)
+    #model.set_env(wrap_env, force_reset=True)
     model.save(f"./models/{save_path}")
-    
-    # model = PPO.load(f"./models/221015_2201_P6_ppo_rgb_array_ofp_movingavg_nocollisions_1000000")
-    fig, (ax1, ax2) = plt.subplots(2, 1)
-    
-    obs = wrap_env.reset()
-    start_cost = wrap_env.get_attr("last_cost")[0]
-    
+
+    del model
+    wrap_env.close()
+    wrap_eval_env.close()
+
+    final_model = PPO.load(f"./models/{save_path}")
+    best_model = PPO.load(f"./models/best_model/{save_path}/best_model.zip")
+
+    obs_final = test_env_final.reset()
+    obs_best = np.array(obs_final)
+
+    start_cost_final = test_env_final.get_attr("last_cost")[0]
+    start_cost_best = test_env_best.get_attr("last_cost")[0]
+
     rewards = []
-    mhc = []
+    mhc_final = []
+    mhc_best =  []
     images = []
     gain = 0
     gains = []
     c = []
     actions = []
-    done = False
+    dones = [False, False]
+    counter = 0
 
-    eval_steps = 1000
-    while not done:
-        #for _ in range(eval_steps):
-        action, _states = model.predict(obs, deterministic=True)
-        actions.append(action)
-        obs, reward, done, info = wrap_env.step(action)
-        img = Image.fromarray(wrap_env.render(mode='rgb_array'))
-        rewards.append(reward[0])
-        mhc.append(info[0]['mhc'])
-        c.append(info[0]['collisions'])
-        images.append(img)
-    
-    final_cost = mhc[-1]
+    fig, axs = plt.subplots(2, 2)
+    while False in dones:
+        counter += 1
 
-    print(start_cost, final_cost)
-    cost_saved = final_cost-start_cost
-    cost_saved_rel = 1-(start_cost/final_cost)
-    ax1.plot(np.arange(1, eval_steps+1), rewards)
-    ax2.plot(np.arange(1, eval_steps+1), mhc)
-    imageio.mimsave(f'gifs/{save_path}_test_env.gif',
-                    [np.array(img.resize((200, 200), Image.NEAREST))
-                     for i, img in enumerate(images) if i % 2 == 0], fps=29)
-    wrap_env.close()
+        if not dones[0]:
+            action_final, _states_final = final_model.predict(obs_final, deterministic=True)
+            obs_final, reward_final, done_final, info_final = test_env_final.step(action_final)
+            img_final = Image.fromarray(test_env_final.render(mode='rgb_array'))
+            dones[0] = done_final
 
-    del model
+        if not dones[1]:
+            action_best, _states_final = final_model.predict(obs_best, deterministic=True)
+            obs_best, reward_best, done_best, info_best = test_env_best.step(action_best)
+            img_best = Image.fromarray(test_env_best.render(mode='rgb_array'))
+            dones[1] = done_best
 
-    fig.show()
+        rewards.append([reward_final[0], reward_best[0]])
+        mhc_final.append(info_final[0]['mhc'])
+        mhc_best.append(info_best[0]['mhc'])
+
+        axs[0, 0].imshow(img_final)
+        axs[1, 0].imshow(img_best)
+        #plt.show()
+
+        axs[0, 1].plot(np.arange(1, len(mhc_final)+1), mhc_final)
+        axs[1, 1].plot(np.arange(1, len(mhc_best)+1), mhc_best)
+        #fig.show()
+
+        fig.canvas.draw()
+        # Now we can save it to a numpy array.
+        data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+        data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+
+        images.append(data)
+        #dones[0], dones[1] = done_final, done_best
+        if counter > 100:
+            print("kill process")
+            break
+
+    imageio.mimsave(f'gifs/{save_path}_test_env.gif', images, fps=10)
+
