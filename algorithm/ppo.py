@@ -15,6 +15,23 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import Video
 from PIL import Image
 from typing import Any, Dict
+import argparse
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--train', action="store_true", help='leave empty for debugging')
+    parser.add_argument('--env', type=str, default='ofp-v0', help='environment name')
+    parser.add_argument('--mode', type=str, default='rgb_array', help='state representation mode')
+    parser.add_argument('--instance', type=str, default='P6', help='problem instance')
+    parser.add_argument('--distance', type=str, default='r', help='distance metric')
+    parser.add_argument('--step_size', type=int, default=1, help='step size for ofp envs')
+    parser.add_argument('--box', action="store_true",  help='input box to use box env, if omitted uses discrete')
+    parser.add_argument('--multi', action="store_true", help='whether to move one or more machines per step')
+    parser.add_argument('--train_steps', type=int, default=1e5, help='number of training steps')
+    parser.add_argument('--num_workers', type=int, default=1, help='number of parallel envs')
+    parser.add_argument('--algo', type=str, default=parser.prog)
+    args = parser.parse_args()
+    return args
 
 
 class TensorboardCallback(BaseCallback):
@@ -82,134 +99,130 @@ class VideoRecorderCallback(BaseCallback):
 
 stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=3, min_evals=5, verbose=1)
 
-instance = 'P6'
-timestamp = datetime.datetime.now().strftime("%y%m%d_%H%M")
-environment = 'ofp'
-algo = 'ppo'
-mode = 'rgb_array'
-train_steps = [5e4]
-aspace = 'discrete'
-multi = False
-vec_env = make_vec_env('ofp-v0',
-                       env_kwargs={'mode': mode, "instance": instance, "aspace": aspace, "multi": multi},
-                       n_envs=1)
+if __name__ == '__main__':
+    timestamp = datetime.datetime.now().strftime("%y%m%d_%H%M")
+    args = parse_args()
 
-vec_eval_env = make_vec_env('ofp-v0',
-                            env_kwargs={'mode': mode, "instance": instance, "aspace": aspace, "multi": multi},
-                            n_envs=1)
+    print(args.algo, args.mode)
+    if args.train:
+        env_kwargs = {
+            'mode': args.mode,
+            'instance': args.instance,
+            'box': args.box,
+            'multi': args.multi
+        }
+        vec_env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
+        vec_eval_env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
+        vec_test_env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
 
-vec_test_env = make_vec_env('ofp-v0',
-                            env_kwargs={'mode': mode, "instance": instance, "aspace": aspace, "multi": multi},
-                            n_envs=1)
+        wrap_env = VecTransposeImage(vec_env)
+        wrap_eval_env = VecTransposeImage(vec_eval_env)
+        test_env_final = VecTransposeImage(vec_test_env)
+        test_env_best = VecTransposeImage(vec_test_env)
 
-wrap_env = VecTransposeImage(vec_env)
-wrap_eval_env = VecTransposeImage(vec_eval_env)
-test_env_final = VecTransposeImage(vec_test_env)
-test_env_best = VecTransposeImage(vec_test_env)
+        a = timestamp
+        b = args.instance
+        c = args.algo.split('.')[0]
+        d = args.mode
+        e = args.env
+        f = 'box' if args.box else 'discrete'
+        g = 'multi' if args.multi else 'single'
+        h = args.train_steps
+        save_path = f"{a}_{b}_{c}_{d}_{e}_{f}_{g}_{h}"
 
+        model = PPO("CnnPolicy",
+                    wrap_env,
+                    learning_rate=0.0003,
+                    n_steps=2048,
+                    batch_size=64,
+                    n_epochs=10,
+                    gamma=0.99,
+                    gae_lambda=0.95,
+                    clip_range=0.2,
+                    clip_range_vf=None,
+                    ent_coef=0.0,
+                    vf_coef=0.5,
+                    max_grad_norm=0.5,
+                    use_sde=False,
+                    sde_sample_freq=- 1,
+                    target_kl=None,
+                    tensorboard_log=f'logs/{save_path}',
+                    create_eval_env=False,
+                    policy_kwargs=None,
+                    verbose=1,
+                    seed=None,
+                    device='cuda',
+                    _init_setup_model=True)
+        video_recorder = VideoRecorderCallback(wrap_eval_env, render_freq=5)
+        eval_callback = EvalCallback(wrap_eval_env,
+                                     best_model_save_path=f'./models/best_model/{save_path}',
+                                     log_path='./logs/',
+                                     eval_freq=1000,
+                                     deterministic=True,
+                                     render=False,
+                                     callback_after_eval=stop_train_callback)
 
-for ts in train_steps:
-    ts = int(ts)
-    save_path = f"{timestamp}_{instance}_{algo}_{mode}_{environment}_{aspace}_multi_{multi}_{ts}"
+        model.learn(total_timesteps=args.train_steps, callback=eval_callback, progress_bar=True)
+        model.save(f"./models/{save_path}")
 
-    model = PPO("CnnPolicy", 
-                wrap_env,
-                learning_rate=0.0003, 
-                n_steps=2048, 
-                batch_size=64,
-                n_epochs=10, 
-                gamma=0.99, 
-                gae_lambda=0.95, 
-                clip_range=0.2, 
-                clip_range_vf=None, 
-                ent_coef=0.0, 
-                vf_coef=0.5, 
-                max_grad_norm=0.5, 
-                use_sde=False, 
-                sde_sample_freq=- 1, 
-                target_kl=None, 
-                tensorboard_log=f'logs/{save_path}', 
-                create_eval_env=False, 
-                policy_kwargs=None, 
-                verbose=1,
-                seed=None, 
-                device='cuda',
-                _init_setup_model=True)
-    video_recorder = VideoRecorderCallback(wrap_eval_env, render_freq=5)
-    eval_callback = EvalCallback(wrap_eval_env,
-                                 best_model_save_path=f'./models/best_model/{save_path}',
-                                 log_path='./logs/',
-                                 eval_freq=1000,
-                                 deterministic=True,
-                                 render=False,
-                                 callback_after_eval=stop_train_callback)
+        del model
+        wrap_env.close()
+        wrap_eval_env.close()
 
-    model.learn(total_timesteps=ts, callback=eval_callback, progress_bar=True)
-    #model.set_env(wrap_env, force_reset=True)
-    model.save(f"./models/{save_path}")
+        final_model = PPO.load(f"./models/{save_path}")
+        best_model = PPO.load(f"./models/best_model/{save_path}/best_model.zip")
 
-    del model
-    wrap_env.close()
-    wrap_eval_env.close()
+        obs_final = test_env_final.reset()
+        obs_best = np.array(obs_final)
 
-    final_model = PPO.load(f"./models/{save_path}")
-    best_model = PPO.load(f"./models/best_model/{save_path}/best_model.zip")
+        start_cost_final = test_env_final.get_attr("last_cost")[0]
+        start_cost_best = test_env_best.get_attr("last_cost")[0]
 
-    obs_final = test_env_final.reset()
-    obs_best = np.array(obs_final)
+        rewards = []
+        mhc_final = []
+        mhc_best = []
+        images = []
+        actions = []
+        dones = [False, False]
+        counter = 0
 
-    start_cost_final = test_env_final.get_attr("last_cost")[0]
-    start_cost_best = test_env_best.get_attr("last_cost")[0]
+        fig, axs = plt.subplots(2, 2)
+        while False in dones:
+            counter += 1
 
-    rewards = []
-    mhc_final = []
-    mhc_best =  []
-    images = []
-    gain = 0
-    gains = []
-    c = []
-    actions = []
-    dones = [False, False]
-    counter = 0
+            if not dones[0]:
+                action_final, _states_final = final_model.predict(obs_final, deterministic=True)
+                obs_final, reward_final, done_final, info_final = test_env_final.step(action_final)
+                img_final = Image.fromarray(test_env_final.render(mode='rgb_array'))
+                dones[0] = done_final
 
-    fig, axs = plt.subplots(2, 2)
-    while False in dones:
-        counter += 1
+            if not dones[1]:
+                action_best, _states_final = final_model.predict(obs_best, deterministic=True)
+                obs_best, reward_best, done_best, info_best = test_env_best.step(action_best)
+                img_best = Image.fromarray(test_env_best.render(mode='rgb_array'))
+                dones[1] = done_best
 
-        if not dones[0]:
-            action_final, _states_final = final_model.predict(obs_final, deterministic=True)
-            obs_final, reward_final, done_final, info_final = test_env_final.step(action_final)
-            img_final = Image.fromarray(test_env_final.render(mode='rgb_array'))
-            dones[0] = done_final
+            rewards.append([reward_final[0], reward_best[0]])
+            mhc_final.append(info_final[0]['mhc'])
+            mhc_best.append(info_best[0]['mhc'])
 
-        if not dones[1]:
-            action_best, _states_final = final_model.predict(obs_best, deterministic=True)
-            obs_best, reward_best, done_best, info_best = test_env_best.step(action_best)
-            img_best = Image.fromarray(test_env_best.render(mode='rgb_array'))
-            dones[1] = done_best
+            axs[0, 0].imshow(img_final)
+            axs[1, 0].imshow(img_best)
+            # plt.show()
 
-        rewards.append([reward_final[0], reward_best[0]])
-        mhc_final.append(info_final[0]['mhc'])
-        mhc_best.append(info_best[0]['mhc'])
+            axs[0, 1].plot(np.arange(1, len(mhc_final)+1), mhc_final)
+            axs[1, 1].plot(np.arange(1, len(mhc_best)+1), mhc_best)
+            # fig.show()
 
-        axs[0, 0].imshow(img_final)
-        axs[1, 0].imshow(img_best)
-        #plt.show()
+            fig.canvas.draw()
+            # Now we can save it to a numpy array.
+            data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+            data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
 
-        axs[0, 1].plot(np.arange(1, len(mhc_final)+1), mhc_final)
-        axs[1, 1].plot(np.arange(1, len(mhc_best)+1), mhc_best)
-        #fig.show()
+            images.append(data)
+            if counter > 100:
+                print("kill process")
+                break
 
-        fig.canvas.draw()
-        # Now we can save it to a numpy array.
-        data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-        data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-
-        images.append(data)
-        #dones[0], dones[1] = done_final, done_best
-        if counter > 100:
-            print("kill process")
-            break
-
-    imageio.mimsave(f'gifs/{save_path}_test_env.gif', images, fps=10)
+        imageio.mimsave(f'gifs/{save_path}_test_env.gif', images, fps=10)
 

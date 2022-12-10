@@ -31,7 +31,7 @@ import numpy as np
                     11, 20,  4,  4,
                     2,  1,  3,  5], dtype=np.uint8))])
 def test_discrete(test_action, expected):
-    env = gym.make('ofp-v0', mode='human', instance='P6', aspace='discrete', multi=False)
+    env = gym.make('ofp-v0', mode='human', instance='P6', box=False, multi=False)
     env.reset()
     s, r, d, i = env.step(test_action)
 
@@ -67,7 +67,7 @@ def test_discrete(test_action, expected):
                                               2,  2,  3,  5], dtype=np.uint8))
              ])
 def test_multidiscrete(test_action, expected):
-    env = gym.make('ofp-v0', mode='human', instance='P6', aspace='discrete', multi=True)
+    env = gym.make('ofp-v0', mode='human', instance='P6', box=False, multi=True)
     env.reset()
     s, r, d, i = env.step(test_action)
 
@@ -102,7 +102,7 @@ def test_multidiscrete(test_action, expected):
                                               2,  2,  3,  5], dtype=np.uint8))
              ])
 def test_box(test_action, expected):
-    env = gym.make('ofp-v0', mode='human', instance='P6', aspace='box', multi=False)
+    env = gym.make('ofp-v0', mode='human', instance='P6', box=True, multi=False)
     env.reset()
     s, r, d, i = env.step(test_action)
 
@@ -135,9 +135,9 @@ def test_box(test_action, expected):
 
              ])
 def test_box_multi(test_action, expected):
-    env = gym.make('ofp-v0', mode='human', instance='P6', aspace='box', multi=True)
+    env = gym.make('ofp-v0', mode='human', instance='P6', box=True, multi=True)
     env.reset()
     s, r, d, i = env.step(test_action)
 
-    assert np.array_equal(s, expected)==True
+    assert np.array_equal(s, expected) == True
     assert d == False
