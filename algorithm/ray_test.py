@@ -2,12 +2,20 @@
 from gym_flp.envs import OfpEnv
 from ray.rllib.algorithms.ppo import PPO
 # Configure the algorithm.
+from ray.tune.registry import register_env
+
+env_creator = {
+    'instance': 'P6'
+}
+
+def env_creator(env_config):
+    return OfpEnv()  # return an env instance
+
+register_env("flp", env_creator)
+
+
 config = {
     # Environment (RLlib understands openAI gym registered strings).
-    "env": OfpEnv,
-    "env_config": {
-            "instance": "P6",
-    },
     # Use 2 environment workers (aka "rollout workers") that parallelly
     # collect samples from their own environment clone(s).
     "num_workers": 1,
@@ -30,4 +38,4 @@ config = {
 }
 
 # Create our RLlib Trainer.
-algo = PPO(config=config)
+algo = PPO(env='flp')

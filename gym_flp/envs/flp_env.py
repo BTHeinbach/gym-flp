@@ -533,7 +533,7 @@ class OfpEnv(gym.Env):
 
         if self.mode == "rgb_array":
             if self.plant_Y < 36 or self.plant_X < 36:
-                self.plant_Y, self.plant_X = 36, 36
+                self.plant_Y, self.plant_X = 42, 42
 
         self.lower_bounds = {'Y': 0,
                              'X': 0,
