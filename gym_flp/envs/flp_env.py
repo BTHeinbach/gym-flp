@@ -699,20 +699,8 @@ class OfpEnv(gym.Env):
         if isinstance(self.action_space, gym.spaces.Discrete):
             i = np.int(np.floor(action/ 4))  # Facility on which the action is
 
-            match action%4:
-                case 0:
-                    temp_state[4 * i] += step_size
-                case 1:
-                    temp_state[4 * i + 1] += step_size
-                case 2:
-                    temp_state[4 * i] -= step_size
-                case 3:
-                    temp_state[4 * i + 1] -= step_size
-
-        elif isinstance(self.action_space, gym.spaces.MultiDiscrete):
-            for i in range(0, action.shape[0]):
-
-                match action[i]:
+            if not action == self.action_space.n-1:
+                match action%4:
                     case 0:
                         temp_state[4 * i] += step_size
                     case 1:
@@ -721,8 +709,26 @@ class OfpEnv(gym.Env):
                         temp_state[4 * i] -= step_size
                     case 3:
                         temp_state[4 * i + 1] -= step_size
-                    case 4:
-                        temp_state
+            else:
+                temp_state=temp_state
+
+        elif isinstance(self.action_space, gym.spaces.MultiDiscrete):
+            for i in range(0, action.shape[0]):
+
+                if not action == self.action_space.n - 1:
+                    match action[i]:
+                        case 0:
+                            temp_state[4 * i] += step_size
+                        case 1:
+                            temp_state[4 * i + 1] += step_size
+                        case 2:
+                            temp_state[4 * i] -= step_size
+                        case 3:
+                            temp_state[4 * i + 1] -= step_size
+                        case 4:
+                            temp_state
+                else:
+                    temp_state=temp_state
 
         elif isinstance(self.action_space, gym.spaces.Box):
             if multi:

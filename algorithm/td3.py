@@ -87,8 +87,8 @@ environment = 'ofp'
 algo = 'td3'
 mode = 'rgb_array'
 aspace = 'box'
-multi = False
-train_steps = [5e4]
+multi = True
+train_steps = [2e6]
 vec_env = make_vec_env('ofp-v0',
                        env_kwargs={'mode': mode, "instance": instance, "aspace": aspace, "multi": multi},
                        n_envs=1)
@@ -117,8 +117,8 @@ for ts in train_steps:
                 wrap_env,
                 learning_rate=0.0001,
                 buffer_size=1000000,
-                learning_starts=100,
-                batch_size=100,
+                learning_starts=10000,
+                batch_size=128,
                 tau=0.005,
                 gamma=0.99,
                 train_freq=(10, 'episode'),
@@ -136,10 +136,11 @@ for ts in train_steps:
                 device='auto',
                 _init_setup_model=True,
                 tensorboard_log=f'logs/{save_path}')
-    model.learn(total_timesteps=ts, callback=eval_callback)
-    model.save(f"./models/{save_path}")
+    #model.learn(total_timesteps=ts, callback=eval_callback)
+    #model.save(f"./models/{save_path}")
 
-    # model = PPO.load(f"./models/221015_2201_P6_ppo_rgb_array_ofp_movingavg_nocollisions_1000000")
+    model = TD3.load(r'C:\Users\HHB\PycharmProjects\gym-flp-dev\algorithm\models\best_model\221130_0726_P6_td3_ofp_box_multi_1000000\best_model.zip')
+    save_path = '221201_0654_P6_td3_ofp_box_multi_1000000'
     fig, (ax1, ax2) = plt.subplots(2, 1)
 
     obs = wrap_env.reset()
@@ -173,9 +174,9 @@ for ts in train_steps:
     cost_saved_rel = 1 - (start_cost / final_cost)
     ax1.plot(np.arange(1, len(rewards) + 1), rewards)
     ax2.plot(np.arange(1, len(rewards) + 1), mhc)
-    imageio.mimsave(f'gifs/{save_path}_test_env.gif',
+    imageio.mimsave(f'gifs/{save_path}_eval_env.gif',
                     [np.array(img.resize((200, 200), Image.NEAREST))
-                     for i, img in enumerate(images) if i % 2 == 0], fps=29)
+                     for i, img in enumerate(images) if i % 2 == 0], fps=10)
     wrap_env.close()
 
     del model

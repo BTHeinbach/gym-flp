@@ -80,14 +80,15 @@ class VideoRecorderCallback(BaseCallback):
             )
         return True
 
-stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=3, min_evals=5, verbose=1)
 
-instance = 'P6'
+stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=100, min_evals=10, verbose=1)
+
+instance = 'P12'
 timestamp = datetime.datetime.now().strftime("%y%m%d_%H%M")
 environment = 'ofp'
 algo = 'ppo'
 mode = 'rgb_array'
-train_steps = [5e4]
+train_steps = [10e6]
 aspace = 'discrete'
 multi = False
 vec_env = make_vec_env('ofp-v0',
@@ -114,20 +115,20 @@ for ts in train_steps:
 
     model = PPO("CnnPolicy", 
                 wrap_env,
-                learning_rate=0.0003, 
+                learning_rate=8.98e-5,
                 n_steps=2048, 
-                batch_size=64,
-                n_epochs=10, 
+                batch_size=1024,
+                n_epochs=20,
                 gamma=0.99, 
                 gae_lambda=0.95, 
-                clip_range=0.2, 
+                clip_range=0.1,
                 clip_range_vf=None, 
                 ent_coef=0.0, 
                 vf_coef=0.5, 
                 max_grad_norm=0.5, 
                 use_sde=False, 
                 sde_sample_freq=- 1, 
-                target_kl=None, 
+                target_kl=0.2,
                 tensorboard_log=f'logs/{save_path}', 
                 create_eval_env=False, 
                 policy_kwargs=None, 
@@ -139,10 +140,11 @@ for ts in train_steps:
     eval_callback = EvalCallback(wrap_eval_env,
                                  best_model_save_path=f'./models/best_model/{save_path}',
                                  log_path='./logs/',
-                                 eval_freq=1000,
+                                 eval_freq=10000,
                                  deterministic=True,
                                  render=False,
-                                 callback_after_eval=stop_train_callback)
+                                 callback_after_eval=stop_train_callback,
+                                 n_eval_episodes=20)
 
     model.learn(total_timesteps=ts, callback=eval_callback, progress_bar=True)
     #model.set_env(wrap_env, force_reset=True)
