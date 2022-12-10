@@ -24,12 +24,12 @@ train_steps = np.append(np.outer(10.0 ** (np.arange(4, 6)), np.arange(1, 10, 1))
 train_steps = [1e5]
 vec_env = make_vec_env('ofp-v0',
                        env_kwargs={'mode': mode, "instance": instance, "aspace": aspace, "multi": multi},
-                       n_envs=1)
+                       n_envs=4)
 wrap_env = VecTransposeImage(vec_env)
 
 vec_eval_env = make_vec_env('ofp-v0',
                             env_kwargs={'mode': mode, "instance": instance, "aspace": aspace, "multi": multi},
-                            n_envs=1)
+                            n_envs=4)
 wrap_eval_env = VecTransposeImage(vec_eval_env)
 
 #env = gym.make('ofp-v0', instance='P6', mode='rgb_array', aspace='continuous', multi=False)
@@ -56,13 +56,13 @@ for ts in train_steps:
 
     model = DDPG("CnnPolicy",
                 wrap_env,
-                learning_rate=0.001,
-                buffer_size=10000,
-                learning_starts=100,
-                batch_size=100,
+                learning_rate=0.0001,
+                buffer_size=1000000,
+                learning_starts=10000,
+                batch_size=128,
                 tau=0.005,
                 gamma=0.99,
-                train_freq=(1, 'episode'),
+                train_freq=(10, 'episode'),
                 gradient_steps=-1,
                 action_noise=action_noise,
                 replay_buffer_class=None,
@@ -74,7 +74,7 @@ for ts in train_steps:
                 _init_setup_model=True,
                 tensorboard_log=f'logs/{save_path}',
                 verbose=5,)
-    model.learn(total_timesteps=ts)
+    model.learn(total_timesteps=ts, callback=eval_callback)
     model.save(f"./models/{save_path}")
 
     # model = PPO.load(f"./models/221015_2201_P6_ppo_rgb_array_ofp_movingavg_nocollisions_1000000")
@@ -112,10 +112,9 @@ for ts in train_steps:
     ax1.plot(rewards)
     ax2.plot(mhc)
     imageio.mimsave(f'gifs/{save_path}_test_env.gif',
-                    [np.array(img.resize((200, 200), Image.NEAREST)) for i, img in enumerate(images) if i % 2 == 0],
-                    fps=29)
+                    [np.array(Image.fromarray(img).resize((200, 200), Image.NEAREST)) for i, img in enumerate(images) if i % 2 == 0],
+                    fps=15)
     print(mhc, rewards, c)
     vec_eval_env.close()
     del model
-y = np.array([i for i in experiment_results.values()])
-plt.plot(train_steps, abs(y[:, 0]), )
+
