@@ -604,7 +604,7 @@ class OfpEnv(gym.Env):
         Y = np.floor(np.outer(np.array([0,0.25,0.5,0.75,1]),self.upper_bounds['Y']))
         X = np.floor(np.outer([0, 1/3, 2/3, 1],self.upper_bounds['X']))
         
-        if self.n==12:
+        if self.n == 12:
             
             y_centroids = np.tile(np.floor([(i+j)/2 for i,j in zip(Y[:,-1], Y[1:,])]).flatten(),3)
             x_centroids = np.tile(np.floor([(i+j)/2 for i,j in zip(X[:,-1], X[1:,])]),4).flatten()
@@ -612,7 +612,7 @@ class OfpEnv(gym.Env):
             state_prelim[0::4] = y_centroids
             state_prelim[1::4] = x_centroids
         
-        elif self.n==6:
+        elif self.n == 6:
             state_prelim[0]=np.floor(self.upper_bounds['Y'])/2
             state_prelim[1]=np.floor(self.upper_bounds['X'])/2
             state_prelim[4]=np.floor(self.upper_bounds['Y'])-1

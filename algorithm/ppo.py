@@ -202,6 +202,7 @@ if __name__ == '__main__':
                 img_best = Image.fromarray(test_env_best.render(mode='rgb_array'))
                 dones[1] = done_best
 
+
             rewards.append([reward_final[0], reward_best[0]])
             mhc_final.append(info_final[0]['mhc'])
             mhc_best.append(info_best[0]['mhc'])
