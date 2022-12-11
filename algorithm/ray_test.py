@@ -1,7 +1,9 @@
 # Import the RL algorithm (Algorithm) we would like to use.
 from gym_flp.envs import OfpEnv
-from ray.rllib.algorithms.ppo import PPO
-# Configure the algorithm.
+
+import ray
+import ray.rllib.algorithms.ppo as ppo
+from ray.tune.logger import pretty_print
 from ray.tune.registry import register_env
 
 env_creator = {
@@ -13,29 +15,24 @@ def env_creator(env_config):
 
 register_env("flp", env_creator)
 
-
-config = {
-    # Environment (RLlib understands openAI gym registered strings).
-    # Use 2 environment workers (aka "rollout workers") that parallelly
-    # collect samples from their own environment clone(s).
-    "num_workers": 1,
-    # Change this to "framework: torch", if you are using PyTorch.
-    # Also, use "framework: tf2" for tf2.x eager execution.
-    "framework": "torch",
-    # Tweak the default model provided automatically by RLlib,
-    # given the environment's observation- and action spaces.
-    "model": {
-        "fcnet_hiddens": [64, 64],
-        "fcnet_activation": "relu",
-    },
-    # Set up a separate evaluation worker set for the
-    # `algo.evaluate()` call after training (see below).
-    "evaluation_num_workers": 1,
-    # Only for evaluation runs, render the env.
-    "evaluation_config": {
-        "render_env": True,
-    },
+config ={
+    'framework': 'torch'
 }
+ray.init()
+config = ppo.DEFAULT_CONFIG.copy()
+config["num_gpus"] = 0
+config["num_workers"] = 1
+config["horizon"] = 32
+config["log_level"] = 'INFO'
+config['framework'] = 'torch'
+algo = ppo.PPO(config=config, env="flp")
 
-# Create our RLlib Trainer.
-algo = PPO(env='flp')
+# Can optionally call algo.restore(path) to load a checkpoint.
+
+for i in range(1):
+    print(i)
+   # Perform one iteration of training the policy with PPO
+    result = algo.train()
+    print(pretty_print(result))
+
+algo.evaluate()
