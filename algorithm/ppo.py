@@ -10,7 +10,7 @@ import torch as th
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, BaseCallback, StopTrainingOnNoModelImprovement
-from stable_baselines3.common.vec_env import VecTransposeImage
+from stable_baselines3.common.vec_env import VecTransposeImage, DummyVecEnv
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import Video
 from PIL import Image
@@ -103,7 +103,7 @@ if __name__ == '__main__':
     timestamp = datetime.datetime.now().strftime("%y%m%d_%H%M")
     args = parse_args()
 
-    print(args.algo, args.mode)
+    args.train = True
     if args.train:
         env_kwargs = {
             'mode': args.mode,
@@ -111,14 +111,16 @@ if __name__ == '__main__':
             'box': args.box,
             'multi': args.multi
         }
-        vec_env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
-        vec_eval_env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
-        vec_test_env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
+        env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
+        eval_env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
+        test_env_final = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
+        test_env_best = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
 
-        wrap_env = VecTransposeImage(vec_env)
-        wrap_eval_env = VecTransposeImage(vec_eval_env)
-        test_env_final = VecTransposeImage(vec_test_env)
-        test_env_best = VecTransposeImage(vec_test_env)
+        if args.mode == 'rgb_array':
+            env = VecTransposeImage(env)
+            eval_env = VecTransposeImage(eval_env)
+            test_env_final = VecTransposeImage(test_env_final)
+            test_env_best = VecTransposeImage(test_env_best)
 
         a = timestamp
         b = args.instance
@@ -130,8 +132,8 @@ if __name__ == '__main__':
         h = args.train_steps
         save_path = f"{a}_{b}_{c}_{d}_{e}_{f}_{g}_{h}"
 
-        model = PPO("CnnPolicy",
-                    wrap_env,
+        model = PPO("MlpPolicy",
+                    env,
                     learning_rate=0.0003,
                     n_steps=2048,
                     batch_size=64,
@@ -153,11 +155,11 @@ if __name__ == '__main__':
                     seed=None,
                     device='cuda',
                     _init_setup_model=True)
-        video_recorder = VideoRecorderCallback(wrap_eval_env, render_freq=5)
-        eval_callback = EvalCallback(wrap_eval_env,
+        video_recorder = VideoRecorderCallback(eval_env, render_freq=5)
+        eval_callback = EvalCallback(eval_env,
                                      best_model_save_path=f'./models/best_model/{save_path}',
                                      log_path='./logs/',
-                                     eval_freq=1000,
+                                     eval_freq=10000,
                                      deterministic=True,
                                      render=False,
                                      callback_after_eval=stop_train_callback)
@@ -166,17 +168,24 @@ if __name__ == '__main__':
         model.save(f"./models/{save_path}")
 
         del model
-        wrap_env.close()
-        wrap_eval_env.close()
+        env.close()
+        eval_env.close()
 
         final_model = PPO.load(f"./models/{save_path}")
         best_model = PPO.load(f"./models/best_model/{save_path}/best_model.zip")
 
         obs_final = test_env_final.reset()
-        obs_best = np.array(obs_final)
+        obs_best = test_env_best.reset()
 
-        start_cost_final = test_env_final.get_attr("last_cost")[0]
-        start_cost_best = test_env_best.get_attr("last_cost")[0]
+        if isinstance(test_env_final, VecTransposeImage) or isinstance(test_env_final, DummyVecEnv):
+            start_cost_final = test_env_final.get_attr("last_cost")[0]
+        else:
+            start_cost_final = test_env_final.last_cost
+
+        if isinstance(test_env_final, VecTransposeImage) or isinstance(test_env_final, DummyVecEnv):
+            start_cost_best = test_env_final.get_attr("last_cost")[0]
+        else:
+            start_cost_best = test_env_best.last_cost
 
         rewards = []
         mhc_final = []
