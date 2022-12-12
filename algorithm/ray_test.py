@@ -24,7 +24,9 @@ config["num_workers"] = 1
 config["horizon"] = 32
 config["log_level"] = 'INFO'
 config['framework'] = 'torch'
-
+config["evaluation_interval"]=1000
+config["evaluation_num_workers"]=1
+config["keep_per_episode_custom_metrics"]=True
 algo = ppo.PPO(config=config, env="flp")
 
 # Can optionally call algo.restore(path) to load a checkpoint.
@@ -44,3 +46,4 @@ results = tune.Tuner(
     ).fit()
 
 algo.evaluate()
+ray.shutdown()
