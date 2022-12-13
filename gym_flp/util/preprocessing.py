@@ -41,7 +41,6 @@ def build_action_space(env, box, multi):
         if multi:
             action_space = spaces.Box(low=np.array([-1.0 for _ in range(env.n*2)]),
                                       high=np.array([1.0 for _ in range(env.n*2)]),
-                                      # high=np.tile([env.upper_bounds['Y'], env.upper_bounds['X']], reps=6),
                                       dtype='float32')
         else:
             action_space = spaces.Box(low=np.array([-1.0, -1.0, -1.0]), high=np.array([1.0, 1.0, 1.0]), dtype='float32')
@@ -49,4 +48,11 @@ def build_action_space(env, box, multi):
         print("No action space selected or selected space not supported")
     return action_space
 
-# self.action_space = spaces.Box(low=np.array([0, 0, 0]), high=np.array([self.n, ]))
+
+def centroids(state1d):
+    top_left_y = state1d[0::4]
+    top_left_x = state1d[1::4]
+    heights = state1d[2::4]
+    widths = state1d[3::4]
+
+    return top_left_y+0.5*heights, top_left_x+0.5*widths
