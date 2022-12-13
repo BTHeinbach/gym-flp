@@ -17,7 +17,7 @@ def env_creator(env_config):
 
 register_env("flp", env_creator)
 
-ray.init()
+ray.init(local_mode=True)
 config = ppo.DEFAULT_CONFIG.copy()
 config["num_gpus"] = 0
 config["num_workers"] = 1
