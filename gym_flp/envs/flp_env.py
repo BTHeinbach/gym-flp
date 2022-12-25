@@ -449,7 +449,7 @@ class ofpEnv(gym.Env):
       machine class implemented  
       '''    
     
-    def __init__(self, mode=None, instance=None, distance=None, aspect_ratio=None, step_size=None, greenfield=None):
+    def __init__(self, mode = None, instance = None, distance = None, aspect_ratio = None, step_size = None, greenfield = None):
         self.mode = mode
         self.instance = instance 
         self.distance = distance
@@ -468,11 +468,20 @@ class ofpEnv(gym.Env):
         self.F = self.FlowMatrices[self.instance]
         self.n = self.problems[self.instance]
         self.AreaData = self.sizes[self.instance]
+              
         self.beta, self.fac_length_x, self.fac_width_y, self.fac_area, self.min_side_length = getAreaData(self.AreaData) #Investigate available area data and compute missing values if needed
-        
+                
         if self.fac_width_y is None or self.fac_length_x is None:
             self.fac_length_x = np.random.randint(self.min_side_length*self.aspect_ratio, np.min(self.fac_area), size=(self.n, ))
             self.fac_width_y = np.round(self.fac_area/self.fac_length_x)
+          
+        #comment TV: Dimension of all facilities is equal
+        #self.fac_length_x = np.array([9,9,9,9])  
+            
+        if self.fac_length_x is None:
+            self.fac_length_x = self.fac_width_y
+        elif self.fac_width_y is None:
+            self.fac_width_y = self.fac_length_x
             
         # Check if there are Layout Dimensions available, if not provide enough (sqrt(a)*1.5)
         if self.instance in self.LayoutWidths.keys() and self.instance in self.LayoutLengths.keys():
@@ -483,10 +492,16 @@ class ofpEnv(gym.Env):
             # Design a squared plant layout
             self.plant_X = int(round(math.sqrt(self.plant_area),0)) # We want the plant dimensions to be integers to fit them into an image
             self.plant_Y = self.plant_X 
-        
+                
         if self.greenfield:
             self.plant_X = 2*self.plant_X
             self.plant_Y = 2*self.plant_Y
+            
+        #comment TV: Check if instance is P4
+        if self.instance == 'P4':
+            self.plant_X = 0
+            self.plant_Y = 0
+
 
         # These values need to be set manually, e.g. acc. to data from literature. Following Eq. 1 in Ulutas & Kulturel-Konak (2012), the minimum side length can be determined by assuming the smallest facility will occupy alone. 
         self.aspect_ratio = int(max(self.beta)) if not self.beta is None else self.aspect_ratio
@@ -497,7 +512,6 @@ class ofpEnv(gym.Env):
         action_set = ['N', 'E', 'S', 'W']
         self.action_list = [action_set[i] for j in range(self.n) for i in range(len(action_set))]
         self.action_space = spaces.Discrete(len(self.action_list)) #5 actions for each facility: left, up, down, right, rotate + idle action across all
-        #self.action_space = spaces.Box(low=np.array([0, max(self.fac_width_y)/2, max(self.fac_length_x)/2]), high = np.array([self.n, self.plant_Y - max(self.fac_width_y)/2, self.plant_X - max(self.fac_length_x)/2 ]), dtype=np.int8)
         
         # 4. Define observation_space for human and rgb_array mode 
         # Formatting for the observation_space:
@@ -505,16 +519,16 @@ class ofpEnv(gym.Env):
         
         if self.mode == "rgb_array":
             if self.plant_Y < 36 or self.plant_X < 36:
-                self.plant_Y, self.plant_X = 36, 36
+                self.plant_Y, self.plant_X = 48,48
         
         
-        self.lower_bounds = {'Y': 0,
-                             'X': 0,
+        self.lower_bounds = {'Y': max(self.fac_width_y)/2,
+                             'X': max(self.fac_length_x)/2,
                              'y': min(self.fac_width_y),
                              'x': min(self.fac_length_x)}
         
-        self.upper_bounds = {'Y': self.plant_Y - max(self.fac_width_y),
-                             'X': self.plant_X - max(self.fac_length_x),
+        self.upper_bounds = {'Y': self.plant_Y - max(self.fac_width_y)/2,
+                             'X': self.plant_X - max(self.fac_length_x)/2,
                              'y': max(self.fac_width_y),
                              'x': max(self.fac_length_x)}
         
@@ -533,8 +547,16 @@ class ofpEnv(gym.Env):
             
         #Keep a version of this to sample initial states from in reset()
         self.state_space = spaces.Box(low=observation_low, high=observation_high, dtype = np.uint8) 
-        self.observation_space = spaces.Box(low = 0, high = 255, shape= (self.plant_Y, self.plant_X, 3), dtype = np.uint8) # Image representation, channel-last for PyTorch CNNs
+        
+        
+        if self.mode == "rgb_array":
+            self.observation_space = spaces.Box(low = 0, high = 255, shape= (self.plant_Y, self.plant_X, 3), dtype = np.uint8) # Image representation, channel-last for PyTorch CNNs
 
+        elif self.mode == "human":
+            self.observation_space = spaces.Box(low=observation_low, high=observation_high, dtype = np.uint8) # Vector representation of coordinates
+        else:
+            print("Nothing correct selected")
+            
         # 5. Set some starting points
         self.reward = 0
         self.state = None # Variable for state being returned to agent
@@ -613,6 +635,26 @@ class ofpEnv(gym.Env):
             #o.li.
             state_prelim[20]=np.floor(self.lower_bounds['Y'])+2
             state_prelim[21]=np.floor(self.lower_bounds['X'])+2
+            
+        #comment TV: Default arrangement for 4 facilities
+        elif self.n==4:
+            #u.re.
+            state_prelim[0]=np.floor(self.upper_bounds['Y'])-1
+            state_prelim[1]=np.floor(self.upper_bounds['X'])-1
+            
+            #o.re.
+            state_prelim[4]=np.floor(self.lower_bounds['Y'])+2
+            state_prelim[5]=np.floor(self.upper_bounds['X'])-1
+            
+            #u.li.
+            state_prelim[8]=np.floor(self.upper_bounds['Y'])-1
+            state_prelim[9]=np.floor(self.lower_bounds['X'])+2
+            
+            
+            #o.li.
+            state_prelim[12]=np.floor(self.lower_bounds['Y'])+2
+            state_prelim[13]=np.floor(self.lower_bounds['X'])+2
+            
         
         self.internal_state = np.array(state_prelim)
         self.state = np.array(self.internal_state) if self.mode == 'human' else self.ConvertCoordinatesToState(self.internal_state)
@@ -645,19 +687,12 @@ class ofpEnv(gym.Env):
     
     def step(self, action):        
         m = np.int(np.ceil((action+1)/4))   # Facility on which the action is
-        step_size = self.step_size
-
-        #m = int(action[0])
-        #print(action[0])
+        step_size = self.step_size       
         
         temp_state = np.array(self.internal_state) # Get copy of state to manipulate:
         old_state = np.array(self.internal_state)  # Keep copy of state to restore if boundary condition is met       
         done = False
-
-        #temp_state[4*(m-1)] = action[1]
-        #temp_state[4 * (m - 1)+1] = action[2]
-
-
+        
         # Do the action 
         if self.action_list[action] == "S":
             temp_state[4*(m-1)] += step_size
@@ -716,6 +751,10 @@ class ofpEnv(gym.Env):
     def ConvertCoordinatesToState(self, state_prelim):    
         data = np.zeros((self.plant_Y, self.plant_X, 3),dtype=np.uint8)
         
+        #change self.F with self.TM row 720 and 721 incl. sources and sinks edit self.F = self.T
+        #self.D = getDistances(state_prelim[1::4], state_prelim[0::4])
+        #mhc, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1,self.n+1)))
+        
         sources = np.sum(self.F, axis = 1)
         sinks = np.sum(self.F, axis = 0)
         
@@ -725,14 +764,17 @@ class ofpEnv(gym.Env):
         R = np.ones(shape=(self.n,)).astype(int)*255
         G = np.array((sources-np.min(sources))/(np.max(sources)-np.min(sources))*255).astype(int)
         B = np.array((sinks-np.min(sinks))/(np.max(sinks)-np.min(sinks))*255).astype(int)
-       
+               
         for x, p in enumerate(p):
-            y_from = state_prelim[4*x+0]
-            x_from = state_prelim[4*x+1]
-            y_to = state_prelim[4*x+0] + state_prelim[4*x+2]
-            x_to = state_prelim[4*x+1] + state_prelim[4*x+3]
+            y_from = state_prelim[4*x+0] -0.5 * state_prelim[4*x+2]
+            x_from = state_prelim[4*x+1] -0.5 * state_prelim[4*x+3]
+            y_to = state_prelim[4*x+0] + 0.5 * state_prelim[4*x+2]
+            x_to = state_prelim[4*x+1] + 0.5 * state_prelim[4*x+3]
         
             data[int(y_from):int(y_to), int(x_from):int(x_to)] = [R[p-1], G[p-1], B[p-1]]
+    
+            #comment TV: Color of all facilities is white
+            #data[int(y_from):int(y_to), int(x_from):int(x_to)] = [255, 255, 255]
         return np.array(data, dtype=np.uint8)
         
     def render(self, mode = None):       
@@ -895,15 +937,15 @@ class stsEnv(gym.Env):
                 
                 new_name = None if not len(c)==1 else c[0]
                 
-                Node(name=new_name,
-                     contains=contains,
-                     parent=parent,
-                     area=area,
-                     width=width,
-                     length=length,
-                     upper_left=starting_point,
-                     lower_right=starting_point + np.array([width, length]),
-                     dtype=float)
+                Node(name = new_name, \
+                     contains = contains, \
+                     parent = parent, \
+                     area = area, \
+                     width = width, \
+                     length = length, \
+                     upper_left = starting_point, \
+                     lower_right = starting_point + np.array([width, length]), \
+                     dtype = float)
                 
                 starting_point = starting_point + np.array([0, length]) if parent.name == 'V' else starting_point + np.array([width, 0])
                 
