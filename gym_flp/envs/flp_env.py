@@ -519,6 +519,7 @@ class ofpEnv(gym.Env):
         
         if self.mode == "rgb_array":
             if self.plant_Y < 36 or self.plant_X < 36:
+                # Comment TV: custom scale of the layout
                 self.plant_Y, self.plant_X = 48,48
         
         
