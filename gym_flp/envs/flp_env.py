@@ -17,7 +17,15 @@ from gym_flp.util import preprocessing
 class QapEnv(gym.Env):
     metadata = {'render.modes': ['rgb_array', 'human']}
 
-    def __init__(self, mode=None, instance=None):
+    def __init__(self,
+                 mode=None,
+                 instance=None,
+                 distance=None,
+                 aspect_ratio=None,
+                 step_size=None,
+                 greenfield=None,
+                 box=False,
+                 multi=False):
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
         self.DistanceMatrices, self.FlowMatrices = pickle.load(
             open(os.path.join(__location__, 'instances/discrete', 'qap_matrices.pkl'), 'rb'))
@@ -45,7 +53,7 @@ class QapEnv(gym.Env):
 
         # If you are using images as input, the input values must be in [0, 255] as the observation is normalized (dividing by 255 to have values in [0, 1]) when using CNN policies.       
         if self.mode == "rgb_array":
-            self.observation_space = spaces.Box(low=0, high=255, shape=(3, 1, self.n),
+            self.observation_space = spaces.Box(low=0, high=255, shape=(36, 36, 3),
                                                 dtype=np.uint8)  # Image representation
         elif self.mode == 'human':
             self.observation_space = spaces.Box(low=1, high=self.n, shape=(self.n,), dtype=np.float32)
@@ -70,7 +78,7 @@ class QapEnv(gym.Env):
 
         MHC, self.TM = self.MHC.compute(self.D, self.F, np.array(self.internal_state))
         self.initial_MHC = MHC
-        self.last_MHC = self.initial_MHC
+        self.last_cost = self.initial_MHC
 
         state = np.array(self.internal_state) if self.mode == 'human' else np.array(self.get_image())
 
@@ -90,29 +98,30 @@ class QapEnv(gym.Env):
         if self.movingTargetReward == np.inf:
             self.movingTargetReward = MHC
 
-        reward = self.last_MHC - MHC
+        reward = self.last_cost - MHC
         if MHC <= self.movingTargetReward:
-            reward += 10
+            reward = 1
             self.movingTargetReward = MHC
             self.best_state = np.array(fromState)
 
-        self.last_MHC = MHC
+        self.last_cost = MHC
         self.Actual_Minimum = self.movingTargetReward
 
         self.internal_state = np.array(fromState)
         state = np.array(self.internal_state) if self.mode == 'human' else np.array(self.get_image())
         done = True if self.step_counter >= self.max_steps else False
 
-        return state, reward, done, MHC
+        return state, reward, done, {'mhc':MHC}
         # return newState, reward, done
 
     def render(self, mode=None):
 
         img = self.get_image()
 
-        plt.imshow(img)
+        #plt.imshow(img)
         plt.axis('off')
-        plt.show()
+        #plt.show()
+        return np.array(img)
 
     def close(self):
         pass
@@ -149,13 +158,21 @@ class QapEnv(gym.Env):
 
         img = Image.fromarray(rgb, 'RGB')
 
-        return img
+        return img.resize((36, 36), Image.NEAREST)
 
 
 class FbsEnv(gym.Env):
     metadata = {'render.modes': ['rgb_array', 'human']}
 
-    def __init__(self, mode=None, instance=None):
+    def __init__(self,
+                 mode=None,
+                 instance=None,
+                 distance=None,
+                 aspect_ratio=None,
+                 step_size=None,
+                 greenfield=None,
+                 box=False,
+                 multi=False):
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
         self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(
             open(os.path.join(__location__,
@@ -399,12 +416,12 @@ class FbsEnv(gym.Env):
 
         self.fac_x, self.fac_y, self.fac_b, self.fac_h = self.getCoordinates()
         self.D = getDistances(self.fac_x, self.fac_y)
-        reward, self.TM = self.MHC.compute(self.D, self.F, fromState)
+        mhc, self.TM = self.MHC.compute(self.D, self.F, fromState)
         self.state = self.constructState(self.fac_x, self.fac_y, self.fac_b, self.fac_h, self.n)
 
         self.done = False  # Always false for continuous task
 
-        return self.state[:], reward, self.done, {}
+        return self.state[:], -mhc, self.done, {'mhc': mhc}
 
     def render(self, mode=None):
         if self.mode == "human":
@@ -816,7 +833,15 @@ class OfpEnv(gym.Env):
 class StsEnv(gym.Env):
     metadata = {'render.modes': ['rgb_array', 'human']}
 
-    def __init__(self, mode=None, instance=None):
+    def __init__(self,
+                 mode=None,
+                 instance=None,
+                 distance=None,
+                 aspect_ratio=None,
+                 step_size=None,
+                 greenfield=None,
+                 box=False,
+                 multi=False):
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
         self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(
             open(os.path.join(__location__,

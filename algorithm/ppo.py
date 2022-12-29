@@ -2,11 +2,15 @@ import gym
 import gym_flp
 import imageio
 import datetime
+import tkinter as tk
+import json
+import os
 
 import numpy as np
 import matplotlib.pyplot as plt
 import torch as th
 
+from tkinter import filedialog
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, BaseCallback, StopTrainingOnNoModelImprovement
@@ -103,33 +107,35 @@ if __name__ == '__main__':
     timestamp = datetime.datetime.now().strftime("%y%m%d_%H%M")
     args = parse_args()
 
+
+    env_kwargs = {
+        'mode': args.mode,
+        'instance': args.instance,
+        'box': args.box,
+        'multi': args.multi
+    }
+    env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
+    eval_env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
+    test_env_final = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
+    test_env_best = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
+
+    if args.mode == 'rgb_array':
+        env = VecTransposeImage(env)
+        eval_env = VecTransposeImage(eval_env)
+        test_env_final = VecTransposeImage(test_env_final)
+        test_env_best = VecTransposeImage(test_env_best)
+
+    a = timestamp
+    b = args.instance
+    c = args.algo.split('.')[0]
+    d = args.mode
+    e = args.env
+    f = 'box' if args.box else 'discrete'
+    g = 'multi' if args.multi else 'single'
+    h = int(args.train_steps)
+
     args.train = True
     if args.train:
-        env_kwargs = {
-            'mode': args.mode,
-            'instance': args.instance,
-            'box': args.box,
-            'multi': args.multi
-        }
-        env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
-        eval_env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
-        test_env_final = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
-        test_env_best = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
-
-        if args.mode == 'rgb_array':
-            env = VecTransposeImage(env)
-            eval_env = VecTransposeImage(eval_env)
-            test_env_final = VecTransposeImage(test_env_final)
-            test_env_best = VecTransposeImage(test_env_best)
-
-        a = timestamp
-        b = args.instance
-        c = args.algo.split('.')[0]
-        d = args.mode
-        e = args.env
-        f = 'box' if args.box else 'discrete'
-        g = 'multi' if args.multi else 'single'
-        h = args.train_steps
         save_path = f"{a}_{b}_{c}_{d}_{e}_{f}_{g}_{h}"
 
         model = PPO("MlpPolicy",
@@ -171,68 +177,88 @@ if __name__ == '__main__':
         env.close()
         eval_env.close()
 
-        final_model = PPO.load(f"./models/{save_path}")
-        best_model = PPO.load(f"./models/best_model/{save_path}/best_model.zip")
+    else:
+        root = tk.Tk()
+        root.withdraw()
 
-        obs_final = test_env_final.reset()
-        obs_best = test_env_best.reset()
+        path = filedialog.askopenfilename().split('/')[-1]
+        save_path = path.split('.')[0]
+    final_model = PPO.load(f"./models/{save_path}")
+    best_model = PPO.load(f"./models/best_model/{save_path}/best_model.zip")
 
-        if isinstance(test_env_final, VecTransposeImage) or isinstance(test_env_final, DummyVecEnv):
-            start_cost_final = test_env_final.get_attr("last_cost")[0]
-        else:
-            start_cost_final = test_env_final.last_cost
+    obs_final = test_env_final.reset()
+    obs_best = test_env_best.reset()
 
-        if isinstance(test_env_final, VecTransposeImage) or isinstance(test_env_final, DummyVecEnv):
-            start_cost_best = test_env_final.get_attr("last_cost")[0]
-        else:
-            start_cost_best = test_env_best.last_cost
+    if isinstance(test_env_final, VecTransposeImage) or isinstance(test_env_final, DummyVecEnv):
+        start_cost_final = test_env_final.get_attr("last_cost")[0]
+    else:
+        start_cost_final = test_env_final.last_cost
 
-        rewards = []
-        mhc_final = []
-        mhc_best = []
-        images = []
-        actions = []
-        dones = [False, False]
-        counter = 0
+    if isinstance(test_env_final, VecTransposeImage) or isinstance(test_env_final, DummyVecEnv):
+        start_cost_best = test_env_final.get_attr("last_cost")[0]
+    else:
+        start_cost_best = test_env_best.last_cost
 
-        fig, axs = plt.subplots(2, 2)
-        while False in dones:
-            counter += 1
+    rewards = []
+    mhc_final = []
+    mhc_best = []
+    images = []
+    actions = []
+    dones = [False, False]
+    counter = 0
+    experiment_results = {
+        'start_cost_final_model': start_cost_final,
+        'start_cost_best_model': start_cost_best
+    }
 
-            if not dones[0]:
-                action_final, _states_final = final_model.predict(obs_final, deterministic=True)
-                obs_final, reward_final, done_final, info_final = test_env_final.step(action_final)
-                img_final = Image.fromarray(test_env_final.render(mode='rgb_array'))
-                dones[0] = done_final
+    fig, axs = plt.subplots(2, 2)
+    while False in dones:
+        counter += 1
 
-            if not dones[1]:
-                action_best, _states_final = final_model.predict(obs_best, deterministic=True)
-                obs_best, reward_best, done_best, info_best = test_env_best.step(action_best)
-                img_best = Image.fromarray(test_env_best.render(mode='rgb_array'))
-                dones[1] = done_best
+        if not dones[0]:
+            action_final, _states_final = final_model.predict(obs_final, deterministic=True)
+            obs_final, reward_final, done_final, info_final = test_env_final.step(action_final)
+            img_final = Image.fromarray(test_env_final.render(mode='rgb_array'))
+            dones[0] = done_final
+
+        if not dones[1]:
+            action_best, _states_final = final_model.predict(obs_best, deterministic=True)
+            obs_best, reward_best, done_best, info_best = test_env_best.step(action_best)
+            img_best = Image.fromarray(test_env_best.render(mode='rgb_array'))
+            dones[1] = done_best
 
 
-            rewards.append([reward_final[0], reward_best[0]])
-            mhc_final.append(info_final[0]['mhc'])
-            mhc_best.append(info_best[0]['mhc'])
+        rewards.append([reward_final[0], reward_best[0]])
+        mhc_final.append(info_final[0]['mhc'])
+        mhc_best.append(info_best[0]['mhc'])
 
-            axs[0, 0].imshow(img_final)
-            axs[1, 0].imshow(img_best)
-            # plt.show()
+        axs[0, 0].imshow(img_final)
+        axs[1, 0].imshow(img_best)
+        # axs[0, 0].axis('off')
+        # axs[1, 0].axis('off')
+        # plt.show()
 
-            axs[0, 1].plot(np.arange(1, len(mhc_final)+1), mhc_final)
-            axs[1, 1].plot(np.arange(1, len(mhc_best)+1), mhc_best)
-            # fig.show()
+        axs[0, 1].plot(np.arange(1, len(mhc_final)+1), mhc_final)
+        axs[1, 1].plot(np.arange(1, len(mhc_best)+1), mhc_best)
+        # fig.show()
 
-            fig.canvas.draw()
-            # Now we can save it to a numpy array.
-            data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-            data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+        fig.canvas.draw()
+        # Now we can save it to a numpy array.
+        data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+        data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
 
-            images.append(data)
-            if counter > 100:
-                print("kill process")
-                break
+        images.append(data)
+        if counter > 500:
+            print("kill process")
+            break
 
-        imageio.mimsave(f'gifs/{save_path}_test_env.gif', images, fps=10)
+    experiment_results['end_cost_final'] = mhc_final[-1]
+    experiment_results['end_cost_final'] = mhc_best[-1]
+
+    imageio.mimsave(f'gifs/{save_path}_test_env.gif', images, fps=10)
+
+    new_path = os.path.join(os.getcwd(), 'experiments', save_path + '.png')
+    plt.imsave(new_path, images[-2])
+    with open(f'{save_path}.json', 'w') as outfile:
+        json.dump(experiment_results, outfile)
 
