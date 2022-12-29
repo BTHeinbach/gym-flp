@@ -268,7 +268,7 @@ class FbsEnv(gym.Env):
         self.bay[-1] = 1
 
         self.fac_x, self.fac_y, self.fac_b, self.fac_h = self.getCoordinates()
-        self.D = getDistances(self.fac_x, self.fac_y)
+        self.D = self.MHC.getDistances(self.fac_x, self.fac_y)
         reward, self.TM = self.MHC.compute(self.D, self.F, self.permutation[:])
 
         self.state = self.constructState(self.fac_x, self.fac_y, self.fac_b, self.fac_h, self.n)
@@ -415,7 +415,7 @@ class FbsEnv(gym.Env):
             pass  # Keep old state
 
         self.fac_x, self.fac_y, self.fac_b, self.fac_h = self.getCoordinates()
-        self.D = getDistances(self.fac_x, self.fac_y)
+        self.D = self.MHC.getDistances(self.fac_x, self.fac_y)
         mhc, self.TM = self.MHC.compute(self.D, self.F, fromState)
         self.state = self.constructState(self.fac_x, self.fac_y, self.fac_b, self.fac_h, self.n)
 
@@ -676,7 +676,7 @@ class OfpEnv(gym.Env):
             flows=self.F)
         self.counter = 0
 
-        self.D = getDistances(state_prelim[1::4], state_prelim[0::4])
+        self.D = self.MHC.getDistances(state_prelim[1::4], state_prelim[0::4])
         mhc, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1, self.n + 1)))
         self.last_cost = mhc
 
@@ -766,7 +766,7 @@ class OfpEnv(gym.Env):
 
         penalty = 0
 
-        self.D = getDistances(temp_state[1::4], temp_state[0::4])
+        self.D = self.MHC.getDistances(temp_state[1::4], temp_state[0::4])
         mhc, self.TM = self.MHC.compute(D=self.D, F=self.F, s=np.array(range(1, self.n + 1)))
 
         if not self.state_space.contains(temp_state):
@@ -930,7 +930,7 @@ class StsEnv(gym.Env):
         # 2. Build the tree incl. size information
         s = self.TreeBuilder(self.permutation, self.slicing, self.orientation)
         centers = np.array([s[0::4] + 0.5 * s[2::4], s[1::4] + 0.5 * s[3::4]])
-        self.D = getDistances(centers[0], centers[1])
+        self.D = self.MHC.getDistances(centers[0], centers[1])
         reward, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1, self.n + 1)))
 
         if self.mode == "human":
@@ -1165,10 +1165,6 @@ def getAreaData(df):
     return ar, l, w, a, l_min
 
 
-def getDistances(x, y):
-    return np.array(
-        [[abs(float(x[j]) - float(valx)) + abs(float(valy) - float(y[i])) for (j, valy) in enumerate(y)] for (i, valx)
-         in enumerate(x)], dtype=float)
 
 
 def divisor(n):

@@ -36,3 +36,10 @@ class MHC():
         for idx,val in enumerate(a):
             P[idx][val-1]=1
         return P
+
+    def getDistances(x, y):
+        return np.array(
+            [[abs(float(x[j]) - float(valx)) + abs(float(valy) - float(y[i])) for (j, valy) in enumerate(y)] for
+             (i, valx)
+             in enumerate(x)], dtype=float)
+
