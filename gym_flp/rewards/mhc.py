@@ -37,7 +37,7 @@ class MHC():
             P[idx][val-1]=1
         return P
 
-    def getDistances(x, y):
+    def getDistances(self, x, y):
         return np.array(
             [[abs(float(x[j]) - float(valx)) + abs(float(valy) - float(y[i])) for (j, valy) in enumerate(y)] for
              (i, valx)
