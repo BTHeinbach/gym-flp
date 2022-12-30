@@ -47,7 +47,7 @@ class QapEnv(gym.Env):
         self.x = math.ceil((math.sqrt(self.n)))
         self.y = math.ceil((math.sqrt(self.n)))
         self.size = int(self.x * self.y)
-        self.max_steps = 2 * (self.n - 1)
+        self.max_steps = 50 * (self.n - 1)
 
         self.action_space = spaces.Discrete(int((self.n ** 2 - self.n) * 0.5) + 1)
 
@@ -79,7 +79,8 @@ class QapEnv(gym.Env):
         MHC, self.TM = self.MHC.compute(self.D, self.F, np.array(self.internal_state))
         self.initial_MHC = MHC
         self.last_cost = self.initial_MHC
-
+        self.counter = 0
+        self.movingTargetReward = np.inf
         state = np.array(self.internal_state) if self.mode == 'human' else np.array(self.get_image())
 
         return state
@@ -98,18 +99,22 @@ class QapEnv(gym.Env):
         if self.movingTargetReward == np.inf:
             self.movingTargetReward = MHC
 
-        reward = self.last_cost - MHC
-        if MHC <= self.movingTargetReward:
+        #reward = self.last_cost - MHC
+        if MHC < self.movingTargetReward:
+            self.counter = 0
             reward = 1
             self.movingTargetReward = MHC
             self.best_state = np.array(fromState)
+        else:
+            reward = 0
+            self.counter += 1
 
         self.last_cost = MHC
         self.Actual_Minimum = self.movingTargetReward
 
         self.internal_state = np.array(fromState)
         state = np.array(self.internal_state) if self.mode == 'human' else np.array(self.get_image())
-        done = True if self.step_counter >= self.max_steps else False
+        done = True if self.counter > 10 else False
 
         return state, reward, done, {'mhc':MHC}
         # return newState, reward, done

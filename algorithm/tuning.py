@@ -6,7 +6,13 @@ import argparse
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import VecTransposeImage, DummyVecEnv
-
+from optuna.visualization import plot_contour
+from optuna.visualization import plot_edf
+from optuna.visualization import plot_intermediate_values
+from optuna.visualization import plot_optimization_history
+from optuna.visualization import plot_parallel_coordinate
+from optuna.visualization import plot_param_importances
+from optuna.visualization import plot_slice
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -36,8 +42,8 @@ class Objective:
 
     def __call__(self, trial):
         # Calculate an objective value by using the extra arguments.
-        n_steps = trial.suggest_int("n_steps", 32, 2048, log=True)
-        batch_size = trial.suggest_int("batch_size", 32, 2048, log=True)
+        n_steps = trial.suggest_categorical("n_steps", [16 ,32, 64, 128, 256, 1024, 2048, 4096])
+        batch_size = trial.suggest_categorical("batch_size", [16 ,32, 64, 128, 256, 1024, 2048, 4096])
         n_epochs = trial.suggest_int("n_epochs", 1, 101, step=5)
 
         # Floating point parameter (log)
@@ -54,13 +60,14 @@ class Objective:
         model = PPO("CnnPolicy",
                     env,
                     learning_rate=learning_rate,
-                    n_steps=n_steps,
-                    batch_size=batch_size,
-                    n_epochs=n_epochs,
+                    n_steps=2048,
+                    batch_size=32,
+                    n_epochs=10,
                     device='cuda',
+                    seed=42,
                     _init_setup_model=True)
 
-        model.learn(total_timesteps=args.train_steps)
+        model.learn(total_timesteps=args.train_steps, progress_bar=True)
 
         obs = eval_env.reset()
 
@@ -70,17 +77,27 @@ class Objective:
             start_cost_final = eval_env.last_cost
 
         rewards = []
-        mhc_final = []
+        mhc = []
         done = False
         counter = 0
 
         while not done:
-            action_final, _states_final = final_model.predict(obs_final, deterministic=True)
-            obs_final, reward_final, done_final, info_final = test_env_final.step(action_final)
+            action, _states = model.predict(obs, deterministic=True)
+            obs, reward, done, info = eval_env.step(action)
+
+            mhc.append(info[0]['mhc'])
+            rewards.append(reward[0])
+
+        return (start_cost_final-mhc[-1])/start_cost_final
 
 
 if __name__ == '__main__':
     #timestamp = datetime.datetime.now().strftime("%y%m%d_%H%M")
     args = parse_args()
-    study = optuna.create_study(pruner=optuna.pruners.MedianPruner())
+    study = optuna.create_study(direction="maximize",
+    sampler=optuna.samplers.TPESampler(seed=42))
+    optuna.logging.set_verbosity(optuna.logging.INFO)
     study.optimize(Objective(args), n_trials=20)
+    plot_optimization_history(study)
+    plot_intermediate_values(study)
+
