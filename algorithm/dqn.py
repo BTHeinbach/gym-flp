@@ -102,7 +102,7 @@ class VideoRecorderCallback(BaseCallback):
         return True
 
 
-stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=3, min_evals=5, verbose=1)
+stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=20, min_evals=5, verbose=1)
 
 
 if __name__ == '__main__':
@@ -158,7 +158,7 @@ if __name__ == '__main__':
                     max_grad_norm=10,
                     policy_kwargs=None,
                     verbose=1,
-                    seed=None,
+                    seed=42,
                     device='auto',
                     _init_setup_model=True,
                     tensorboard_log=f'logs/{save_path}')
@@ -225,7 +225,7 @@ if __name__ == '__main__':
             dones[0] = done_final
 
         if not dones[1]:
-            action_best, _states_final = final_model.predict(obs_best, deterministic=True)
+            action_best, _states_best = best_model.predict(obs_best, deterministic=True)
             obs_best, reward_best, done_best, info_best = test_env_best.step(action_best)
             img_best = Image.fromarray(test_env_best.render(mode='rgb_array'))
             dones[1] = done_best
@@ -254,8 +254,8 @@ if __name__ == '__main__':
             print("kill process")
             break
 
-    experiment_results['end_cost_final'] = mhc_final[-1]
-    experiment_results['end_cost_final'] = mhc_best[-1]
+    experiment_results['cost_final'] = mhc_final
+    experiment_results['cost_best'] = mhc_best
 
     imageio.mimsave(f'gifs/{save_path}_test_env.gif', images, fps=10)
 

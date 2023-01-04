@@ -2,6 +2,7 @@ import optuna
 import gym
 import gym_flp
 import argparse
+import plotly
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
@@ -42,9 +43,9 @@ class Objective:
 
     def __call__(self, trial):
         # Calculate an objective value by using the extra arguments.
-        n_steps = trial.suggest_categorical("n_steps", [16 ,32, 64, 128, 256, 1024, 2048, 4096])
-        batch_size = trial.suggest_categorical("batch_size", [16 ,32, 64, 128, 256, 1024, 2048, 4096])
-        n_epochs = trial.suggest_int("n_epochs", 1, 101, step=5)
+        #n_steps = trial.suggest_categorical("n_steps", [16 ,32, 64, 128, 256, 1024, 2048, 4096])
+        #batch_size = trial.suggest_categorical("batch_size", [16 ,32, 64, 128, 256, 1024, 2048, 4096])
+        #n_epochs = trial.suggest_int("n_epochs", 1, 101, step=5)
 
         # Floating point parameter (log)
         learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
@@ -98,6 +99,9 @@ if __name__ == '__main__':
     sampler=optuna.samplers.TPESampler(seed=42))
     optuna.logging.set_verbosity(optuna.logging.INFO)
     study.optimize(Objective(args), n_trials=20)
-    plot_optimization_history(study)
-    plot_intermediate_values(study)
+    x=plot_optimization_history(study)
+    y=plot_slice(study)
+    x.show()
+    y.show()
+    #plot_intermediate_values(study)
 
