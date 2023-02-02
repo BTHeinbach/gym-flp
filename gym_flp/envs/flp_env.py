@@ -47,7 +47,7 @@ class QapEnv(gym.Env):
         self.x = math.ceil((math.sqrt(self.n)))
         self.y = math.ceil((math.sqrt(self.n)))
         self.size = int(self.x * self.y)
-        self.max_steps = 50 * (self.n - 1)
+        self.max_steps = 5 * (self.n - 1)
 
         self.action_space = spaces.Discrete(int((self.n ** 2 - self.n) * 0.5) + 1)
 
@@ -75,7 +75,7 @@ class QapEnv(gym.Env):
         self.step_counter = 0  # Zählt die Anzahl an durchgeführten Aktionen
 
         self.internal_state = default_rng().choice(range(1, self.n + 1), size=self.n, replace=False)
-
+        self.internal_state = np.array([5,4,7,1,2,3,6])
         MHC, self.TM = self.MHC.compute(self.D, self.F, np.array(self.internal_state))
         self.initial_MHC = MHC
         self.last_cost = self.initial_MHC
@@ -88,13 +88,14 @@ class QapEnv(gym.Env):
     def step(self, action):
         # Create new State based on action 
         self.step_counter += 1
+        #self.counter = 0
 
         fromState = np.array(self.internal_state)
 
         swap = self.actions[action]
         fromState[swap[0] - 1], fromState[swap[1] - 1] = fromState[swap[1] - 1], fromState[swap[0] - 1]
 
-        MHC, self.TM = self.MHC._compute(self.D, self.F, fromState)
+        MHC, self.TM = self.MHC.compute(self.D, self.F, fromState)
 
         if self.movingTargetReward == np.inf:
             self.movingTargetReward = MHC
@@ -112,9 +113,15 @@ class QapEnv(gym.Env):
         self.last_cost = MHC
         self.Actual_Minimum = self.movingTargetReward
 
+        if action == self.action_space.n-1:
+            done = True
+
+        else:
+            done = True if self.counter > self.max_steps else False
+
         self.internal_state = np.array(fromState)
         state = np.array(self.internal_state) if self.mode == 'human' else np.array(self.get_image())
-        done = True if self.counter > 10 else False
+
 
         return state, reward, done, {'mhc':MHC}
         # return newState, reward, done
@@ -496,7 +503,7 @@ class OfpEnv(gym.Env):
         self.mode = mode if mode is not None else 'rgb_array'
         self.instance = instance if instance is not None else 'P6'
         self.distance = distance
-        self.aspect_ratio = 2 if aspect_ratio is None else aspect_ratio
+        self.aspect_ratio = 1 if aspect_ratio is None else aspect_ratio
         self.step_size = 1 if step_size is None else step_size
         self.greenfield = False if greenfield is None else greenfield
         self.multi = multi
@@ -518,8 +525,12 @@ class OfpEnv(gym.Env):
             self.AreaData)  # Investigate available area data and compute missing values if needed
 
         if self.fac_width_y is None or self.fac_length_x is None:
-            self.fac_length_x = np.random.randint(self.min_side_length * self.aspect_ratio, np.min(self.fac_area),
-                                                  size=(self.n,))
+            y = [preprocessing.divisor(int(x)) for x in self.fac_area]
+
+            y_ = [[x for x in z if x > 2 and x < 42] for z in y]
+            self.fac_length_x =  np.array([i[int(np.floor(len(i)/2))] if len(i) > 1 else i[-1] for i in y_])
+            #self.fac_length_x = np.random.randint(self.min_side_length * self.aspect_ratio, np.min(self.fac_area),
+            #                                      size=(self.n,))
             self.fac_width_y = np.round(self.fac_area / self.fac_length_x)
 
         # Check if there are Layout Dimensions available, if not provide enough (sqrt(a)*1.5)
@@ -555,30 +566,30 @@ class OfpEnv(gym.Env):
 
         if self.mode == "rgb_array":
             if self.plant_Y < 36 or self.plant_X < 36:
-                self.plant_Y, self.plant_X = 42, 42
+                self.plant_Y, self.plant_X = 36, 36
 
-        self.lower_bounds = {'Y': 0,
-                             'X': 0,
-                             'y': min(self.fac_width_y),
-                             'x': min(self.fac_length_x)}
+        self.lower_bounds = {'Y': np.zeros(self.n),
+                             'X': np.zeros(self.n),
+                             'y': self.fac_width_y,
+                             'x': self.fac_length_x}
 
-        self.upper_bounds = {'Y': self.plant_Y - max(self.fac_width_y),
-                             'X': self.plant_X - max(self.fac_length_x),
-                             'y': max(self.fac_width_y),
-                             'x': max(self.fac_length_x)}
+        self.upper_bounds = {'Y': self.plant_Y - self.fac_width_y,
+                             'X': self.plant_X - self.fac_length_x,
+                             'y': self.fac_width_y,
+                             'x': self.fac_length_x}
 
         observation_low = np.zeros(4 * self.n)
         observation_high = np.zeros(4 * self.n)
 
-        observation_low[0::4] = self.lower_bounds['Y']
-        observation_low[1::4] = self.lower_bounds['X']
-        observation_low[2::4] = self.lower_bounds['y']
-        observation_low[3::4] = self.lower_bounds['x']
+        observation_low[0::4] = np.array([i for i in self.lower_bounds['Y']])
+        observation_low[1::4] = np.array([i for i in self.lower_bounds['X']])
+        observation_low[2::4] = np.array([i for i in self.lower_bounds['y']])
+        observation_low[3::4] = np.array([i for i in self.lower_bounds['x']])
 
-        observation_high[0::4] = self.upper_bounds['Y']
-        observation_high[1::4] = self.upper_bounds['X']
-        observation_high[2::4] = self.upper_bounds['y']
-        observation_high[3::4] = self.upper_bounds['x']
+        observation_high[0::4] = np.array([i for i in self.upper_bounds['Y']])
+        observation_high[1::4] = np.array([i for i in self.upper_bounds['X']])
+        observation_high[2::4] = np.array([i for i in self.upper_bounds['y']])
+        observation_high[3::4] = np.array([i for i in self.upper_bounds['x']])
 
         # Keep a version of this to sample initial states from in reset()
         self.state_space = spaces.Box(low=observation_low, high=observation_high, dtype=np.uint8)
@@ -600,79 +611,53 @@ class OfpEnv(gym.Env):
         self.state = None  # Variable for state being returned to agent
         self.internal_state = None  # Placeholder for state variable for internal manipulation in rgb_array mode
         self.counter = 0
-        self.pseudo_stability = 5  # If the reward has not improved in the last x steps, terminate the episode
+        self.pseudo_stability = 10  # If the reward has not improved in the last x steps, terminate the episode
         self.best_reward = None
         self.reset_counter = 0
         self.MHC = rewards.mhc.MHC()
         self.empty = np.zeros((self.plant_Y, self.plant_X, 3), dtype=np.uint8)
+        self.last_cost = 0
+        self.TM = None
+        self.randomize = True
 
     def reset(self):
-
         state_prelim = self.state_space.sample()
         state_prelim[2::4] = self.fac_width_y
         state_prelim[3::4] = self.fac_length_x
 
-        i = 0
-        while np.sum(self.collision_test(state_prelim)) > 0:
-            state_prelim = self.state_space.sample()
-            state_prelim[2::4] = self.fac_width_y
-            state_prelim[3::4] = self.fac_length_x
-            i += 1
-            if i > 1000:
-                break
+                # Create fixed positions for reset:
+        if self.randomize:
+        # Check if plant can be made square
+            if math.isqrt(self.n)**2 == self.n:
+                Y = np.floor(np.outer(np.arange(start=0, stop=1, step=1/math.isqrt(self.n)), np.max(self.upper_bounds['Y'])))
+                X = np.floor(np.outer(np.arange(start=0, stop=1, step=1/math.isqrt(self.n)), np.max(self.upper_bounds['X'])))
 
-        # Create fixed positions for reset:
+            elif len(util.preprocessing.divisor(self.n)) > 1:
+                divisors = util.preprocessing.divisor(self.n)
+                stepsize_index = int(np.floor(len(divisors)/2))
 
-        Y = np.floor(np.outer(np.array([0,0.25,0.5,0.75,1]),self.upper_bounds['Y']))
-        X = np.floor(np.outer([0, 1/3, 2/3, 1],self.upper_bounds['X']))
-        
-        if self.n == 12:
-            
-            y_centroids = np.tile(np.floor([(i+j)/2 for i,j in zip(Y[:,-1], Y[1:,])]).flatten(),3)
-            x_centroids = np.tile(np.floor([(i+j)/2 for i,j in zip(X[:,-1], X[1:,])]),4).flatten()
-            
-            state_prelim[0::4] = y_centroids
-            state_prelim[1::4] = x_centroids
-        
-        elif self.n == 6:
-            state_prelim[0]=np.floor(self.upper_bounds['Y'])/2
-            state_prelim[1]=np.floor(self.upper_bounds['X'])/2
-            state_prelim[4]=np.floor(self.upper_bounds['Y'])-1
-            state_prelim[5]=np.floor(self.lower_bounds['X'])+1
-            state_prelim[8]=np.floor(self.lower_bounds['Y'])+1
-            state_prelim[9]=np.floor(self.lower_bounds['X'])+1
-            state_prelim[12]=np.floor(self.upper_bounds['Y'])-1
-            state_prelim[13]=np.floor(self.upper_bounds['X'])-1
-            state_prelim[16]=np.floor(self.upper_bounds['Y'])/2
-            state_prelim[17]=np.floor(self.upper_bounds['X'])-1
-            state_prelim[20]=np.floor(self.lower_bounds['Y'])+1
-            state_prelim[21]=np.floor(self.upper_bounds['X'])-1
-            
-            
-            #Shuffle
-            #u.re.
-            state_prelim[0]=np.floor(self.upper_bounds['Y'])-1
-            state_prelim[1]=np.floor(self.upper_bounds['X'])-1
-            
-            #o.re.
-            state_prelim[4]=np.floor(self.lower_bounds['Y'])+2
-            state_prelim[5]=np.floor(self.upper_bounds['X'])-1
-            
-            #Mitte
-            state_prelim[8]=np.floor(self.upper_bounds['Y'])/2
-            state_prelim[9]=np.floor(self.upper_bounds['X'])/2
-            
-            #u.li.
-            state_prelim[12]=np.floor(self.upper_bounds['Y'])-1
-            state_prelim[13]=np.floor(self.lower_bounds['X'])+2
-            
-            #Mitte re.
-            state_prelim[16]=np.floor(self.upper_bounds['Y'])/2
-            state_prelim[17]=np.floor(self.upper_bounds['X'])-1
-            
-            #o.li.
-            state_prelim[20]=np.floor(self.lower_bounds['Y'])+2
-            state_prelim[21]=np.floor(self.lower_bounds['X'])+2
+                x_partition = divisors[stepsize_index]
+                y_partition = divisors[stepsize_index-1]
+                X = np.floor(np.outer(np.arange(start=0, stop=1.001, step=1/x_partition), np.max(self.upper_bounds['X'])))
+                Y = np.floor(np.outer(np.arange(start=0, stop=1.001, step=1/y_partition), np.max(self.upper_bounds['Y'])))
+
+                #state_prelim[0::4] = np.tile(np.floor([(i+j)/2 for i, j in zip(Y[:, -1], Y[1:, ].flatten())]), x_partition)
+                #state_prelim[1::4] = np.tile(np.floor([(i+j)/2 for i, j in zip(X[:, -1], X[1:, ].flatten())]), y_partition)
+
+                state_prelim[0::4] = np.tile(Y.flatten()[:-1], x_partition)
+                state_prelim[1::4] = np.tile(X.flatten()[:-1], y_partition)
+
+
+        else:
+            i = 0
+            while np.sum(self.collision_test(state_prelim)) > 0:
+                state_prelim = self.state_space.sample()
+                state_prelim[2::4] = self.fac_width_y
+                state_prelim[3::4] = self.fac_length_x
+                i += 1
+                if i > 10000:
+                    print("no")
+                    break
 
         self.internal_state = np.array(state_prelim)
         self.state = np.array(self.internal_state) if self.mode == 'human' else preprocessing.make_image_from_coordinates(
@@ -774,13 +759,6 @@ class OfpEnv(gym.Env):
         self.D = self.MHC.getDistances(temp_state[1::4], temp_state[0::4])
         mhc, self.TM = self.MHC.compute(D=self.D, F=self.F, s=np.array(range(1, self.n + 1)))
 
-        if not self.state_space.contains(temp_state):
-            done = True
-            penalty = -1
-            temp_state = np.array(old_state)
-        else:
-            penalty = 0
-
         # #2 Test if initial state causing a collision. If yes than initialize a new state until there is no collision
         collisions = self.collision_test(
             temp_state)  # Pass every 4th item starting at 0 (x pos) and 1 (y pos) for checking
@@ -796,39 +774,43 @@ class OfpEnv(gym.Env):
 
         # Make rewards for observation
 
+        if not self.state_space.contains(temp_state):
+            done = True
+            p1 = -1
+            temp_state = np.array(old_state)
+        else:
+            p1 = 0
+
+        if np.sum(collisions) > 0:
+            p2 = -1
+        else:
+            p2=0
+
+
         if mhc < self.last_cost:
-            self.last_cost=mhc
+            self.last_cost = mhc
             self.counter = 0
-            mhc_penalties = 1
+            reward = 1
         else:
-            self.counter+=1
-            mhc_penalties = 0
+            self.counter += 1
+            reward = 0
 
-        #self.last_cost = mhc
-
-        if np.sum(collisions) == 0:
-            collision_penalties = 0
-        else:
-            collision_penalties = -2
-        #self.counter +=1 if mhc >= self.last_cost else 0
-        #self.last_cost = mhc if mhc < self.last_cost else self.last_cost
-        #mhc_penalties = [1 if x < self.last_cost else 0 for x in mhcs]
-        #collision_penalties = [1 if x == 0 else -1 for x in collisions]
-
-        reward = mhc_penalties + collision_penalties
+        # self.counter +=1 if mhc >= self.last_cost else 0
+        # self.last_cost = mhc if mhc < self.last_cost else self.last_cost
+        # mhc_penalties = [1 if x < self.last_cost else 0 for x in mhcs]
+        # collision_penalties = [1 if x == 0 else -1 for x in collisions]
 
         # Check for terminality for observation
         if self.counter >= self.pseudo_stability:
             done = True
-        #elif np.sum(collisions)!=0:
+        # elif np.sum(collisions)!=0:
         #    done = True
 
-        #print(self.counter, done)
-        return np.array(self.state), reward + penalty, done, {'mhc': mhc, 'collisions': sum(collisions), 'r':reward}
+        return np.array(self.state), reward+p1+p2, done, {'mhc': mhc, 'collisions': sum(collisions), 'r':reward}
 
     def render(self, mode=None):
         return preprocessing.make_image_from_coordinates(coordinates=self.internal_state,
-                                                         canvas=np.zeros((self.plant_Y, self.plant_X, 3), dtype=np.uint8),
+                                                         canvas=255*np.ones((self.plant_Y, self.plant_X, 3), dtype=np.uint8),
                                                          flows=self.F)
 
     def close(self):
@@ -1168,12 +1150,3 @@ def getAreaData(df):
     a = np.reshape(a, (a.shape[0],))
 
     return ar, l, w, a, l_min
-
-
-
-
-def divisor(n):
-    for i in range(n):
-        x = [i for i in range(1, n + 1) if not n % i]
-        print(i)
-    return x

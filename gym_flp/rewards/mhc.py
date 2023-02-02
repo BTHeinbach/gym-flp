@@ -12,13 +12,13 @@ class MHC():
         
         #Deduct results from known optimal value 
         #reward = self.best if np.array_equal(fromState, self.opt) else self.best - 0.5*np.trace(np.dot(np.dot(self.F,P), np.dot(self.D,P.T))) #313 is optimal for NEOS n6, needs to be replaced with a dict object
-        transport_intensity = np.dot(np.dot(D,P), np.dot(F,P.T))
+        transport_intensity = np.dot(np.dot(D, P), np.dot(F, P.T))
         MHC = np.trace(transport_intensity)
                 
         return MHC, transport_intensity
      
     def _compute(self, D, F, s):       
-        T = np.zeros((len(s),len(s)))
+        T = np.zeros((len(s), len(s)))
 
         for i in range(len(s)):
             for j in range(len(s)):

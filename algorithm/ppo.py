@@ -137,9 +137,9 @@ if __name__ == '__main__':
     if args.train:
         save_path = f"{a}_{b}_{c}_{d}_{e}_{f}_{g}_{h}"
 
-        model = PPO("MlpPolicy",
+        model = PPO("CnnPolicy",
                     env,
-                    learning_rate=0.0003,
+                    learning_rate=9e-5,
                     n_steps=2048,
                     batch_size=64,
                     n_epochs=10,
@@ -158,7 +158,7 @@ if __name__ == '__main__':
                     policy_kwargs=None,
                     verbose=1,
                     seed=42,
-                    device='cuda',
+                    device='auto',
                     _init_setup_model=True)
         video_recorder = VideoRecorderCallback(eval_env, render_freq=5)
         eval_callback = EvalCallback(eval_env,
@@ -167,7 +167,8 @@ if __name__ == '__main__':
                                      eval_freq=10000,
                                      deterministic=True,
                                      render=False,
-                                     callback_after_eval=stop_train_callback)
+                                     #callback_after_eval=stop_train_callback
+                                     )
 
         model.learn(total_timesteps=args.train_steps, callback=eval_callback, progress_bar=True)
         model.save(f"./models/{save_path}")
@@ -187,6 +188,7 @@ if __name__ == '__main__':
 
     obs_final = test_env_final.reset()
     obs_best = test_env_best.reset()
+    img_first = Image.fromarray(test_env_best.render(mode='rgb_array'))
 
     if isinstance(test_env_final, VecTransposeImage) or isinstance(test_env_final, DummyVecEnv):
         start_cost_final = test_env_final.get_attr("last_cost")[0]
@@ -202,6 +204,7 @@ if __name__ == '__main__':
     mhc_final = []
     mhc_best = []
     images = []
+    imgs = []
     actions = []
     dones = [False, False]
     counter = 0
@@ -224,6 +227,7 @@ if __name__ == '__main__':
             action_best, _states_best = best_model.predict(obs_best, deterministic=True)
             obs_best, reward_best, done_best, info_best = test_env_best.step(action_best)
             img_best = Image.fromarray(test_env_best.render(mode='rgb_array'))
+            imgs.append(img_best)
             dones[1] = done_best
 
 
@@ -233,8 +237,8 @@ if __name__ == '__main__':
 
         axs[0, 0].imshow(img_final)
         axs[1, 0].imshow(img_best)
-        # axs[0, 0].axis('off')
-        # axs[1, 0].axis('off')
+        axs[0, 0].axis('off')
+        axs[1, 0].axis('off')
         # plt.show()
 
         axs[0, 1].plot(np.arange(1, len(mhc_final)+1), mhc_final)
@@ -258,6 +262,8 @@ if __name__ == '__main__':
 
     new_path = os.path.join(os.getcwd(), 'experiments', save_path + '.png')
     plt.imsave(new_path, images[-2])
+    plt.imsave(os.path.join(os.getcwd(), 'experiments', 'layout_ppo.png'), imgs[-2])
+    plt.imsave(os.path.join(os.getcwd(), 'experiments', 'start_layout_ppo.png'), img_first)
     with open(f'{save_path}.json', 'w') as outfile:
         json.dump(experiment_results, outfile)
 

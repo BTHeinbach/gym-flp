@@ -16,10 +16,13 @@ def make_image_from_coordinates(coordinates: np.array, canvas: np.array, flows: 
     sinks = np.sum(flows, axis=0)
 
     p = np.arange(len(coordinates) / 4)
-    r = np.ones(shape=p.shape).astype(int) * 255
+    r = np.ones(shape=p.shape).astype(int) * 0
     g = np.array((sources - np.min(sources)) / (np.max(sources) - np.min(sources)) * 255).astype(int)
     b = np.array((sinks - np.min(sinks)) / (np.max(sinks) - np.min(sinks)) * 255).astype(int)
 
+    r = normalize(a=40, b=255, x_min=0, x_max=np.max(p), x=p).astype(int)
+    g = normalize(a=40, b=255, x_min=np.min(sources), x_max=np.max(sources), x=np.round(sources)).astype(int)
+    b = normalize(a=40, b=255, x_min=np.min(sinks), x_max=np.max(sinks), x=np.round(sinks)).astype(int)
     for x, y in enumerate(p):
         y_from = coordinates[4 * x + 0]
         x_from = coordinates[4 * x + 1]
@@ -56,3 +59,8 @@ def centroids(state1d):
     widths = state1d[3::4]
 
     return top_left_y+0.5*heights, top_left_x+0.5*widths
+
+def divisor(n):
+    for i in range(n):
+        x = [i for i in range(1, n + 1) if not n % i]
+    return x

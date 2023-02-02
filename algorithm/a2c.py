@@ -140,8 +140,8 @@ if __name__ == '__main__':
 
         model = A2C("CnnPolicy",
                     env,
-                    learning_rate=0.0007,
-                    n_steps=32,
+                    learning_rate=9e-5,
+                    n_steps=64,
                     gamma=0.99,
                     gae_lambda=1.0,
                     ent_coef=0.0,
@@ -166,7 +166,8 @@ if __name__ == '__main__':
                                          eval_freq=10000,
                                          deterministic=True,
                                          render=False,
-                                         callback_after_eval=stop_train_callback)
+                                         #callback_after_eval=stop_train_callback
+                                     )
 
 
         model.learn(total_timesteps=args.train_steps, callback=eval_callback, progress_bar=True)
