@@ -13,12 +13,10 @@ pip install gym-flp
 ## Usage
 Any environment must be instantiated with the `gym.make()` method by passing the environment's id, like \verb|'cartpole-v0'|, \verb|'breakout-v0'| or \verb|'taxi-v1'|.
 
-Step-size based environments (those using Discrete / Multi-Discrete action spaces are purposefully
-designed to be at risk of moving facilities beyond the plant boundaries. With this violating feasibility restrictions, these actions must incur negative rewards.
+Step-size based environments (those using Discrete / Multi-Discrete action spaces are purposefully designed to be at risk of moving facilities beyond the plant boundaries. With this violating feasibility restrictions, these actions must incur negative rewards.
 
-Hence, by using `Spaces` we can conveniently leverage the in-built features of Gym, 
-by penalizing any action that leads to off-grid positioning or violations of spatial requirements like minimum side 
-lengths assigning extraordinarily high negative rewards to all actions which lead to states for which the method \verb|env.observation_space.contains(state)| returns \verb|False|.)
+Hence, by using `Spaces` we can conveniently leverage the in-built features of Gym, by penalizing any action that leads to off-grid positioning or violations of spatial requirements like minimum side lengths assigning extraordinarily high negative rewards to all actions which lead to states for which the method \verb|env.observation_space.contains(state)| returns \verb|False|.)
+
 ### Implementation Details
 Furthermore, every environment must have at least these three methods:
 + reset() resets the environment to a pre-defined or random state and returns
@@ -32,12 +30,12 @@ done and info which are explained in more detail below.
 
 1) Quadratic Assignment Problem
 
-The Quadratic Assignment Problem (QAP) goes back to Koopmans and Beckmann [30]. Here, the plant site is divided into rectangular blocks with the same
+The Quadratic Assignment Problem (QAP) goes back to Koopmans and Beckmann [30]. Here, the plant site is divided into rectangular blocks with the same
 area and shape, and one facility is assigned to each block iteratively until an
 optimal assignment is identified in terms of low material handling costs [17].
 That being said, as the true content of a block is irrelevant for the solution,
 the QAP can also be used to solve problems outside of a plant context, such
-as facility location problems. Our environment design follows the original formulation of the QAP by Koopmans and Beckmann [30]:
+as facility location problems. Our environment design follows the original formulation of the QAP by Koopmans and Beckmann [30]:
 Given is a set of facilities N = {1, 2, ...n} to be assigned to a set of locations
 of the same size N. A permutation p represents the non-repeating unique
 assignment of facilities 1 though n to locations. Thus, Sn = p : N → N is the
@@ -47,12 +45,7 @@ distance matrix D = (dij ) as an nxn matrix where dij is the fixed distance
 between the locations i and j. The goal of a QAP is to solve the optimization
 problem
 
-minp∈Sn
-Xn
-i=1
-Xn
-j=1
-fij ∗ dp(i)p(j)
+minp∈Sn Xn i=1 Xn j=1 fij ∗ dp(i)p(j)
 
 where each product fij∗dp(i)p(j)
 is the cost of assigning facility i to location p(i)
@@ -90,8 +83,8 @@ Length of bayi =
 Total department areas in bayi
 Width of the facility (2)
 Following the convention, the FBS notation moves from top to bottom
-and left to right, locating the point of origin in the top-left corner. Conveniently, this relates well to the indices in 2-dimensional numpy arrays although
-in flipped order (rows = axis 0 and columns = axis 1). To facilitate the conversion of array data to an image for further use with Deep Learning-based
+and left to right, locating the point of origin in the top-left corner. Conveniently, this relates well to the indices in 2-dimensional numpy arrays although
+in flipped order (rows = axis 0 and columns = axis 1). To facilitate the conversion of array data to an image for further use with Deep Learning-based
 approaches, we use this convention throughout all continuous formulations. All
 variables named ”width” refer to y coordinates (i.e. rows in an array) and all
 variables ”length” refer to x coordinates (columns), respectively. W and L are
@@ -132,7 +125,7 @@ the layout, and o denotes the direction of the cut. This package uses a 0 to
 indicate vertical cuts and a 1 for horizontal cuts, respectively. This is the key
 difference in comparison with FBS, as STS allows cuts in two rather than one
 direction.
-Given the plant dimensions W, L and all area requirements ai for the facilities, the layout creation follows the following procedure [46]:
+Given the plant dimensions W, L and all area requirements ai for the facilities, the layout creation follows the following procedure [46]:
 1. Build a slicing tree by sequentially cutting p at the positions indicated by
 s in direction o and assign the thus created new vectors to the sub-layouts.
 For any vector slice of size 1, i.e. holding only one facility, it is assigned as
@@ -183,7 +176,7 @@ considered contains area requirements rather than dimensions). Second, by
 passing True to the argument greenfield, plant dimensions are disregarded
 in favour of a greenfield approach. In this case, W and L are programmatically
 set to be five times the size compared to the area demands.
-As with the former continuous formulations, observations in the OFP environment are given as a vector with centre-point coordinates x and y, length
+As with the former continuous formulations, observations in the OFP environment are given as a vector with centre-point coordinates x and y, length
 li and width wi of the facilities or an RGB image. The action space is set up
 as a function of the problem size, i.e. 5 ∗ n + 1. This means that on top of the
 common ’idle’ action introduced before, every facility can be moved with 5
@@ -192,10 +185,10 @@ of layouts in a numpy array, a facility moving ”up” in the layout will actua
 move down in terms of array row indices.
 The OFP environment allows us to best leverage the in-built features of
 Gym by penalizing any action that leads to off-grid positioning or violations
-of spatial requirements like minimum side lengths by assigning extraordinarily high negative rewards to all states which the method env.observation_
+of spatial requirements like minimum side lengths by assigning extraordinarily high negative rewards to all states which the method env.observation_
 space.contains(env.state) evaluates to False. Plus, we can conveniently
 penalize actions leading to collisions.
-The greenfield environment for discrete problems can be invoked by passing the id ofp-v0 to env.make(id). ofp-v0 further takes these optional arguments: mode (allowed values: ’human’ and ’rgb array’), instance, aspect_
+The greenfield environment for discrete problems can be invoked by passing the id ofp-v0 to env.make(id). ofp-v0 further takes these optional arguments: mode (allowed values: ’human’ and ’rgb array’), instance, aspect_
 ratio (floating point), step_size (integer, indicating the number of distance
 units a facility is moved) and greenfield (boolean, indicating whether or not
 the provided plant dimensions should be used).
