@@ -152,7 +152,7 @@ if __name__ == '__main__':
                     replay_buffer_kwargs=None,
                     optimize_memory_usage=False,
                     target_update_interval=10000,
-                    exploration_fraction=0.5,
+                    exploration_fraction=0.9,
                     exploration_initial_eps=1.0,
                     exploration_final_eps=0.05,
                     max_grad_norm=10,
@@ -170,7 +170,8 @@ if __name__ == '__main__':
                                          eval_freq=10000,
                                          deterministic=True,
                                          render=False,
-                                         callback_after_eval=stop_train_callback)
+                                         #callback_after_eval=stop_train_callback
+                                     )
 
         model.learn(total_timesteps=args.train_steps, callback=eval_callback, progress_bar=True)
         model.save(f"./models/{save_path}")
@@ -191,7 +192,7 @@ if __name__ == '__main__':
 
     obs_final = test_env_final.reset()
     obs_best = test_env_best.reset()
-
+    print(test_env_final.get_attr('internal_state'))
     if isinstance(test_env_final, VecTransposeImage) or isinstance(test_env_final, DummyVecEnv):
         start_cost_final = test_env_final.get_attr("last_cost")[0]
     else:
@@ -253,6 +254,8 @@ if __name__ == '__main__':
         if counter > 500:
             print("kill process")
             break
+
+    print(test_env_final.get_attr('internal_state'))
 
     experiment_results['cost_final'] = mhc_final
     experiment_results['cost_best'] = mhc_best
