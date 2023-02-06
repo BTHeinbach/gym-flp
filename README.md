@@ -2,8 +2,13 @@
 Implements different discrete and continuous Facility Layout Problem representations
 
 ## Purpose
+This package aims at supporting Facility Layout Problem (FLP) and/or Operations Research (OR) and/or Reinforcement Learning (RL) researchers/practitioners in solving FLPs. FLP/OR researchers/practicioners can implement their problems into the package and leverage the Gym backbone to quickly start training RL algorithms on their problems. We therefore provide them with a sort of benchmark environment repository which are common in RL research. RL researchers, in turn, may benefit from a hands-on, real-life manufacturing problem set to test RL algorithm advances on beyond toy problems.
 
 ## Installation
+gym-flp can be installed via PyPi:
+```
+pip install gym-flp
+```
 
 ## Usage
 Any environment must be instantiated with the `gym.make()` method by passing the environment's id, like \verb|'cartpole-v0'|, \verb|'breakout-v0'| or \verb|'taxi-v1'|.
