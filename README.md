@@ -119,7 +119,7 @@ i.e. W, L, w, and l. However, as does FBS, STS usually assumes an overall
 plant area that is equal to the sum of facility area requirements.
 
 Following [19] and [45], we use a layout encoding that encompasses three
-distinct items: a permutation vector p, a slicing order vector s, and an orientation vector o. While p is of size i = n, o and s are of size j = n−1. p has the
+distinct items: a permutation vector p, a slicing order vector s, and an orientation vector o. While p is of size i = n, o and s are of size j = n−1. p has the
 same meaning as in QAP and FBS. s describes the position of a cut within
 the layout, and o denotes the direction of the cut. This package uses a 0 to
 indicate vertical cuts and a 1 for horizontal cuts, respectively. This is the key
