@@ -744,8 +744,8 @@ class OfpEnv(gym.Env):
             else:
                 i = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=0, x_max=self.n-1, x=action[0])).astype(int)
 
-                a_y = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['Y'], x_max=self.upper_bounds['Y'], x=action[1])).astype(int)
-                a_x = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['X'], x_max=self.upper_bounds['X'], x=action[2])).astype(int)
+                a_y = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['Y'][i], x_max=self.upper_bounds['Y'][i], x=action[1])).astype(int)
+                a_x = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['X'][i], x_max=self.upper_bounds['X'][i], x=action[2])).astype(int)
 
                 temp_state[4*i] = a_y
                 temp_state[4*i+1] = a_x
