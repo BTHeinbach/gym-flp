@@ -134,6 +134,8 @@ if __name__ == '__main__':
     g = 'multi' if args.multi else 'single'
     h = int(args.train_steps)
 
+    args.train=True
+    args.train_steps = 10000
     if args.train:
         save_path = f"{a}_{b}_{c}_{d}_{e}_{f}_{g}_{h}"
 
@@ -237,8 +239,8 @@ if __name__ == '__main__':
 
         axs[0, 0].imshow(img_final)
         axs[1, 0].imshow(img_best)
-        axs[0, 0].axis('off')
-        axs[1, 0].axis('off')
+        # axs[0, 0].axis('off')
+        # axs[1, 0].axis('off')
         # plt.show()
 
         axs[0, 1].plot(np.arange(1, len(mhc_final)+1), mhc_final)
