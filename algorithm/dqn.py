@@ -208,6 +208,7 @@ if __name__ == '__main__':
     mhc_best = []
     images = []
     actions = []
+    imgs=[]
     dones = [False, False]
     counter = 0
     experiment_results = {
@@ -223,12 +224,14 @@ if __name__ == '__main__':
             action_final, _states_final = final_model.predict(obs_final, deterministic=True)
             obs_final, reward_final, done_final, info_final = test_env_final.step(action_final)
             img_final = Image.fromarray(test_env_final.render(mode='rgb_array'))
+
             dones[0] = done_final
 
         if not dones[1]:
             action_best, _states_best = best_model.predict(obs_best, deterministic=True)
             obs_best, reward_best, done_best, info_best = test_env_best.step(action_best)
             img_best = Image.fromarray(test_env_best.render(mode='rgb_array'))
+            imgs.append(img_best)
             dones[1] = done_best
 
         rewards.append([reward_final[0], reward_best[0]])
@@ -260,6 +263,9 @@ if __name__ == '__main__':
     experiment_results['cost_final'] = mhc_final
     experiment_results['cost_best'] = mhc_best
 
+    imgs[-2].save(f'experiments/{save_path}_2.png')
+    imgs[-1].save(f'experiments/{save_path}_1.png')
+    imgs[0].save(f'experiments/{save_path}_0.png')
     imageio.mimsave(f'gifs/{save_path}_test_env.gif', images, fps=10)
 
     new_path = os.path.join(os.getcwd(), 'experiments', save_path + '.png')

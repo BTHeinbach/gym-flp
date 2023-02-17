@@ -134,8 +134,6 @@ if __name__ == '__main__':
     g = 'multi' if args.multi else 'single'
     h = int(args.train_steps)
 
-    args.train=True
-    args.train_steps = 10000
     if args.train:
         save_path = f"{a}_{b}_{c}_{d}_{e}_{f}_{g}_{h}"
 
@@ -143,7 +141,7 @@ if __name__ == '__main__':
                     env,
                     learning_rate=9e-5,
                     n_steps=2048,
-                    batch_size=64,
+                    batch_size=1024,
                     n_epochs=10,
                     gamma=0.99,
                     gae_lambda=0.95,
@@ -169,7 +167,7 @@ if __name__ == '__main__':
                                      eval_freq=10000,
                                      deterministic=True,
                                      render=False,
-                                     #callback_after_eval=stop_train_callback
+                                     # callback_after_eval=stop_train_callback
                                      )
 
         model.learn(total_timesteps=args.train_steps, callback=eval_callback, progress_bar=True)
@@ -260,12 +258,14 @@ if __name__ == '__main__':
     experiment_results['cost_final'] = mhc_final
     experiment_results['cost_best'] = mhc_best
 
+    imgs[-2].save(r'experiments/ppo_2.png')
+    imgs[-1].save(r'experiments/ppo_1.png')
+    imgs[0].save(r'experiments/ppo_0.png')
     imageio.mimsave(f'gifs/{save_path}_test_env.gif', images, fps=10)
 
     new_path = os.path.join(os.getcwd(), 'experiments', save_path + '.png')
-    plt.imsave(new_path, images[-2])
-    plt.imsave(os.path.join(os.getcwd(), 'experiments', 'layout_ppo.png'), imgs[-2])
-    plt.imsave(os.path.join(os.getcwd(), 'experiments', 'start_layout_ppo.png'), img_first)
+    #plt.imsave(new_path, images[-2])
+    #plt.imsave(os.path.join(os.getcwd(), 'experiments', 'layout_ppo.png'), Image.fromarray(test_env_best.render(mode='rgb_array')))
+    #plt.imsave(os.path.join(os.getcwd(), 'experiments', 'start_layout_ppo.png'), img_first)
     with open(f'{save_path}.json', 'w') as outfile:
         json.dump(experiment_results, outfile)
-
