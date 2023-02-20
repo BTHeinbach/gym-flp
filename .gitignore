@@ -1,2 +1,9 @@
 # Enviroment Variables
 .env
+
+# Folders
+gifs/
+experiments/
+logs/
+models/
+mhc_analyses.ipynb
