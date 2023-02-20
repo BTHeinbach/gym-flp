@@ -7,6 +7,10 @@ gym_flp.egg-info/SOURCES.txt
 gym_flp.egg-info/dependency_links.txt
 gym_flp.egg-info/requires.txt
 gym_flp.egg-info/top_level.txt
+gym_flp/envs/FBS.py
+gym_flp/envs/OFP.py
+gym_flp/envs/QAP.py
+gym_flp/envs/STS.py
 gym_flp/envs/__init__.py
 gym_flp/envs/flp_env.py
 gym_flp/envs/instances/__init__.py
@@ -395,10 +399,12 @@ gym_flp/envs/instances/discrete/solutions/wil100.sln
 gym_flp/envs/instances/discrete/solutions/wil50.sln
 gym_flp/rewards/__init__.py
 gym_flp/rewards/area.py
+gym_flp/rewards/distances.py
 gym_flp/rewards/mhc.py
 gym_flp/testing/__init__.py
 gym_flp/testing/machine_class.py
 gym_flp/testing/machines_json.py
+gym_flp/testing/qap.py
 gym_flp/testing/testing.py
 gym_flp/util/__init__.py
 gym_flp/util/owncloud_upload.py

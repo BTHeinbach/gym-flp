@@ -6,8 +6,9 @@
       <excludeFolder url="file://$MODULE_DIR$/venv2" />
       <excludeFolder url="file://$MODULE_DIR$/venv3" />
       <excludeFolder url="file://$MODULE_DIR$/venvpy38" />
+      <excludeFolder url="file://$MODULE_DIR$/venv-pip" />
     </content>
-    <orderEntry type="inheritedJdk" />
+    <orderEntry type="jdk" jdkName="Python 3.10 (gym-flp) (2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PyDocumentationSettings">

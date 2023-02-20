@@ -10,6 +10,12 @@ gym-flp can be installed via PyPi:
 pip install gym-flp
 ```
 
+Alternative clone this repo and install locally using
+```
+pip install gym-flp -e .
+```
+
+Please note that the algorithm files may require additional package not covered by setup.py, such as Stable-baseline3, imageio, rich, tqdm, matplotlib, torch, tensorboard.
 ## Usage
 Any environment must be instantiated with the `gym.make()` method by passing the environment's id, like \verb|'cartpole-v0'|, \verb|'breakout-v0'| or \verb|'taxi-v1'|.
 
