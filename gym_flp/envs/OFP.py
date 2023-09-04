@@ -172,13 +172,14 @@ class OfpEnv(gym.Env):
         self.empty = np.zeros((self.plant_Y, self.plant_X, 3), dtype=np.uint8)
         self.last_cost = 0
         self.TM = None
-        self.randomize = True
+        self.randomize = False
 
     def reset(self):
         state_prelim = self.state_space.sample()
         state_prelim[2::4] = self.fac_width_y
         state_prelim[3::4] = self.fac_length_x
 
+        self.randomize = False
         # Create fixed positions for reset:
         if self.randomize:
             # Check if plant can be made square
@@ -263,7 +264,7 @@ class OfpEnv(gym.Env):
         # print(action)
         # Disassemble action
         if isinstance(self.action_space, gym.spaces.Discrete):
-            i = np.int(np.floor(action / 4))  # Facility on which the action is
+            i = np.int32(np.floor(action / 4))  # Facility on which the action is
 
             if action != self.action_space.n - 1:
                 if action % 4 == 0:

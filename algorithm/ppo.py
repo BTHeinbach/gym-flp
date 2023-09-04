@@ -134,8 +134,6 @@ if __name__ == '__main__':
     g = 'multi' if args.multi else 'single'
     h = int(args.train_steps)
 
-    args.train=True
-    args.train_steps = 10000
     if args.train:
         save_path = f"{a}_{b}_{c}_{d}_{e}_{f}_{g}_{h}"
 
@@ -143,7 +141,7 @@ if __name__ == '__main__':
                     env,
                     learning_rate=9e-5,
                     n_steps=2048,
-                    batch_size=64,
+                    batch_size=1024,
                     n_epochs=10,
                     gamma=0.99,
                     gae_lambda=0.95,
@@ -156,7 +154,6 @@ if __name__ == '__main__':
                     sde_sample_freq=- 1,
                     target_kl=None,
                     tensorboard_log=f'logs/{save_path}',
-                    create_eval_env=False,
                     policy_kwargs=None,
                     verbose=1,
                     seed=42,

@@ -72,7 +72,7 @@ class QapEnv(gym.Env):
         self.step_counter = 0  # Zählt die Anzahl an durchgeführten Aktionen
 
         self.internal_state = default_rng().choice(range(1, self.n + 1), size=self.n, replace=False)
-        self.internal_state = np.array([5, 4, 7, 1, 2, 3, 6])
+        #self.internal_state = np.array([5, 4, 7, 1, 2, 3, 6])
         MHC, self.TM = self.MHC.compute(self.D, self.F, np.array(self.internal_state))
         self.initial_MHC = MHC
         self.last_cost = self.initial_MHC
