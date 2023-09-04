@@ -33,3 +33,7 @@ for k,v in config.items():
     model.__setattr__(k, v)
 
 print(cfg[algo])
+
+s0 = env.reset()
+s, r, d, i = env.step(env.action_space.sample())
+print(s, r)

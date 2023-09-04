@@ -1,11 +1,11 @@
 import numpy as np
-import gym
+import gymnasium as gym
 import pickle
 import os
 import math
 import matplotlib.pyplot as plt
 
-from gym import spaces
+from gymnasium import spaces
 from numpy.random import default_rng
 from PIL import Image
 from gym_flp import rewards

@@ -1,10 +1,10 @@
 import numpy as np
-import gym
+import gymnasium as gym
 import pickle
 import os
 import math
 
-from gym import spaces
+from gymnasium import spaces
 from numpy.random import default_rng
 from gym_flp import rewards, util
 from gym_flp.util import preprocessing
