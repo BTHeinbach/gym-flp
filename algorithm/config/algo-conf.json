@@ -20,7 +20,7 @@
     "policy_kwargs": null,
     "verbose": 0,
     "seed": null,
-    "device": "auto",
+    "device": "cpu",
     "_init_setup_model": true
   },
   "dqn": {

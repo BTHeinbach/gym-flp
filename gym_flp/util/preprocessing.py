@@ -1,6 +1,6 @@
 import numpy as np
 
-from gymnasium import spaces
+from gym import spaces
 
 
 def rescale_actions(a: int, b: int, x_min: int, x_max: int, x: float):
