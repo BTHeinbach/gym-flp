@@ -1,6 +1,6 @@
 import numpy as np
 
-from gymnasium import spaces
+from gym import spaces
 
 
 def rescale_actions(a: int, b: int, x_min: int, x_max: int, x: float):
@@ -15,6 +15,8 @@ def make_image_from_coordinates(coordinates: np.array, canvas: np.array, flows: 
     sources = np.sum(flows, axis=1)
     sinks = np.sum(flows, axis=0)
 
+    coordinates = np.array([12, 20,  2,  7, 15, 17,  4, 12, 15, 12,  5,  5, 19, 17,  3,  6, 14, 4,  8,  5,  6, 17,  6,  9])
+
     p = np.arange(len(coordinates) / 4)
     r = np.ones(shape=p.shape).astype(int) * 0
     g = np.array((sources - np.min(sources)) / (np.max(sources) - np.min(sources)) * 255).astype(int)
@@ -23,6 +25,10 @@ def make_image_from_coordinates(coordinates: np.array, canvas: np.array, flows: 
     r = normalize(a=40, b=255, x_min=0, x_max=np.max(p), x=p).astype(int)
     g = normalize(a=40, b=255, x_min=np.min(sources), x_max=np.max(sources), x=np.round(sources)).astype(int)
     b = normalize(a=40, b=255, x_min=np.min(sinks), x_max=np.max(sinks), x=np.round(sinks)).astype(int)
+
+    # r = np.zeros(6)
+    # b = np.zeros(6)
+
     for x, y in enumerate(p):
         y_from = coordinates[4 * x + 0]
         x_from = coordinates[4 * x + 1]

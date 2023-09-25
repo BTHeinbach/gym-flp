@@ -1,11 +1,14 @@
 import numpy as np
-import gymnasium as gym
+import gym
 import pickle
 import os
 import math
+import json
 
-from gymnasium import spaces
+from gym import spaces
 from numpy.random import default_rng
+
+import gym_flp.envs.instances.envBuilder
 from gym_flp import rewards, util
 from gym_flp.util import preprocessing
 
@@ -50,50 +53,59 @@ class OfpEnv(gym.Env):
                  mode=None,
                  instance=None,
                  distance=None,
-                 aspect_ratio=None,
                  step_size=None,
                  greenfield=None,
                  box=False,
-                 multi=False):
+                 multi=False,
+                 envId='ofp',
+                 randomize = True):
         self.mode = mode if mode is not None else 'rgb_array'
-        self.instance = instance if instance is not None else 'P6'
+        self.instance = instance.strip().lower() if instance is not None else 'P6'
         self.distance = distance
-        self.aspect_ratio = 1 if aspect_ratio is None else aspect_ratio
         self.step_size = 1 if step_size is None else step_size
         self.greenfield = False if greenfield is None else greenfield
         self.multi = multi
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-        self.problems, self.FlowMatrices, self.sizes, self.LayoutWidths, self.LayoutLengths = pickle.load(
-            open(os.path.join(__location__,
-                              'instances/continual', 'cont_instances.pkl'), 'rb'))
+        if instance != 'custom':
+            with open(os.path.join(__location__, 'instances', 'continuous.json')) as f:
+                g = json.load(f)
+                problem_information = g[instance]
 
-        while not (self.instance in self.FlowMatrices.keys() or self.instance in ['Brewery']):
-            print('Available Problem Sets:', self.FlowMatrices.keys())
-            self.instance = input('Pick a problem:').strip()
+            while not (self.instance in [key.lower() for key in g.keys()]):
+                print('Could not find problem. Available problem sets:', problem_information.keys())
+                instance = input('Pick a problem:').strip()
+                problem_information = g[instance]
+        else:
+            n = int(input('Define problem size:').strip())
+            problem_information = gym_flp.envs.instances.envBuilder.load_from_file(envId.split('-')[0], n)
 
         self.D = None
-        self.F = self.FlowMatrices[self.instance]
-        self.n = self.problems[self.instance]
-        self.AreaData = self.sizes[self.instance]
-        self.beta, self.fac_length_x, self.fac_width_y, self.fac_area, self.min_side_length = getAreaData(
-            self.AreaData)  # Investigate available area data and compute missing values if needed
+        self.F = np.array(problem_information['flows'], dtype=float)
+        self.n = self.F.shape[0]
 
-        if self.fac_width_y is None or self.fac_length_x is None:
+        self.fac_area = np.array(problem_information['areas'], dtype=float)
+        self.fac_width_y = np.array(problem_information['widths'], dtype=float)
+        self.fac_length_x = np.array(problem_information['lengths'], dtype=float)
+
+        #self.fac_width_y = np.array([2, 4, 5, 3, 8, 6])
+        #self.fac_length_x = np.array([7, 12, 5, 6, 5, 9])
+        self.plant_X = int(problem_information['plantX'])
+        self.plant_Y = int(problem_information['plantY'])
+
+        if len(self.fac_width_y) == 0 or len(self.fac_length_x) == 0:
             y = [preprocessing.divisor(int(x)) for x in self.fac_area]
 
-            y_ = [[x for x in z if x > 2 and x < 42] for z in y]
+            y_ = [[x for x in z] for z in y]
+
+            # Remove empty entries
+            y_ = [x for x in y_ if x]
             self.fac_length_x = np.array([i[int(np.floor(len(i) / 2))] if len(i) > 1 else i[-1] for i in y_])
             # self.fac_length_x = np.random.randint(self.min_side_length * self.aspect_ratio, np.min(self.fac_area),
             #                                      size=(self.n,))
             self.fac_width_y = np.round(self.fac_area / self.fac_length_x)
 
-        # Check if there are Layout Dimensions available, if not provide enough (sqrt(a)*1.5)
-        if self.instance in self.LayoutWidths.keys() and self.instance in self.LayoutLengths.keys():
-            self.plant_X = int(
-                self.LayoutLengths[self.instance])  # We need both values to be integers for converting into image
-            self.plant_Y = int(self.LayoutWidths[self.instance])
-        else:
+        if self.plant_X is None or self.plant_Y is None:
             self.plant_area = np.sum(self.fac_area)
             # Design a squared plant layout
             self.plant_X = int(round(math.sqrt(self.plant_area),
@@ -107,9 +119,9 @@ class OfpEnv(gym.Env):
         # These values need to be set manually, e.g. acc. to data from literature.
         # Following Eq. 1 in Ulutas & Kulturel-Konak (2012), the minimum side length can be determined by assuming the
         # smallest facility will occupy alone.
-        self.aspect_ratio = int(max(self.beta)) if not self.beta is None else self.aspect_ratio
-        self.min_side_length = 1
-        self.min_width = self.min_side_length * self.aspect_ratio
+        # self.aspect_ratio = int(max(self.beta)) if not self.beta is None else self.aspect_ratio
+        # self.min_side_length = 1
+        # self.min_width = self.min_side_length * self.aspect_ratio
 
         # 3. Define the possible actions: 5 for each box
 
@@ -117,10 +129,6 @@ class OfpEnv(gym.Env):
         # Formatting for the observation_space:
         # [facility y, facility x, facility width, facility length] -->
         # [self.fac_y, self.fac_x, self.fac_width_y, self.fac_length_x]
-
-        if self.mode == "rgb_array":
-            if self.plant_Y < 36 or self.plant_X < 36:
-                self.plant_Y, self.plant_X = 36, 36
 
         self.lower_bounds = {'Y': np.zeros(self.n),
                              'X': np.zeros(self.n),
@@ -156,7 +164,7 @@ class OfpEnv(gym.Env):
             self.observation_space = spaces.Box(low=observation_low, high=observation_high,
                                                 dtype=np.uint8)  # Vector representation of coordinates
         else:
-            print("Nothing correct selected")
+            raise Exception("Could not find render mode")
 
         self.action_space = util.preprocessing.build_action_space(self, box, multi)
 
@@ -172,7 +180,7 @@ class OfpEnv(gym.Env):
         self.empty = np.zeros((self.plant_Y, self.plant_X, 3), dtype=np.uint8)
         self.last_cost = 0
         self.TM = None
-        self.randomize = False
+        self.randomize = randomize
 
     def reset(self):
         state_prelim = self.state_space.sample()
@@ -185,9 +193,12 @@ class OfpEnv(gym.Env):
             # Check if plant can be made square
             if math.isqrt(self.n) ** 2 == self.n:
                 Y = np.floor(
-                    np.outer(np.arange(start=0, stop=1, step=1 / math.isqrt(self.n)), np.max(self.upper_bounds['Y'])))
+                    np.outer(np.arange(start=0, stop=1.001, step=1 / math.isqrt(self.n)), np.max(self.upper_bounds['Y'])))
                 X = np.floor(
-                    np.outer(np.arange(start=0, stop=1, step=1 / math.isqrt(self.n)), np.max(self.upper_bounds['X'])))
+                    np.outer(np.arange(start=0, stop=1.001, step=1 / math.isqrt(self.n)), np.max(self.upper_bounds['X'])))
+
+                state_prelim[0::4] = np.tile(Y.flatten()[:-1], len(Y.flatten()[:-1]))
+                state_prelim[1::4] = np.tile(X.flatten()[:-1], len(X.flatten()[:-1]))
 
             elif len(util.preprocessing.divisor(self.n)) > 1:
                 divisors = util.preprocessing.divisor(self.n)
@@ -229,7 +240,6 @@ class OfpEnv(gym.Env):
         self.D = self.MHC.getDistances(state_prelim[1::4], state_prelim[0::4])
         mhc, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1, self.n + 1)))
         self.last_cost = mhc
-
         return np.array(self.state)
 
     def collision_test(self, state):
@@ -342,13 +352,13 @@ class OfpEnv(gym.Env):
 
         if not self.state_space.contains(temp_state):
             done = True
-            p1 = -1
+            p1 = -2
             temp_state = np.array(old_state)
         else:
             p1 = 0
 
         if np.sum(collisions) > 0:
-            p2 = -1
+            p2 = -2
         else:
             p2 = 0
 
@@ -371,11 +381,11 @@ class OfpEnv(gym.Env):
         # elif np.sum(collisions)!=0:
         #    done = True
 
-        return np.array(self.state), reward + p1 + p2, done, {'mhc': mhc, 'collisions': sum(collisions), 'r': reward}
+        return np.array(self.state), reward + p1+ p2, done, {'mhc': mhc, 'collisions': sum(collisions), 'r': reward}
 
     def render(self, mode=None):
         return preprocessing.make_image_from_coordinates(coordinates=self.internal_state,
-                                                         canvas=255 * np.ones((self.plant_Y, self.plant_X, 3),
+                                                         canvas=255 * np.zeros((self.plant_Y, self.plant_X, 3),
                                                                               dtype=np.uint8),
                                                          flows=self.F)
 

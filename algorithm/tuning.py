@@ -24,7 +24,8 @@ def parse_args():
     parser.add_argument('--step_size', type=int, default=1, help='step size for ofp envs')
     parser.add_argument('--box', action="store_true",  help='input box to use box env, if omitted uses discrete')
     parser.add_argument('--multi', action="store_true", help='whether to move one or more machines per step')
-    parser.add_argument('--train_steps', type=int, default=1e5, help='number of training steps')
+    parser.add_argument('--train_steps', type=list, default=[1e5], help='number of training steps')
+    parser.add_argument('--learning_rate', type=list, default=[1e-5], help='number of training steps')
     args = parser.parse_args()
     return args
 
@@ -36,7 +37,8 @@ class Objective:
             'mode': args.mode,
             'instance': args.instance,
             'box': args.box,
-            'multi': args.multi
+            'multi': args.multi,
+            'lr': args.learning_rate
         }
 
 
@@ -48,7 +50,7 @@ class Objective:
         #n_epochs = trial.suggest_int("n_epochs", 1, 101, step=5)
 
         # Floating point parameter (log)
-        learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
+        learning_rate = trial.suggest_float("learning_rate", self.env_kwargs['lr'][0], self.env_kwargs['lr'][-1], log=True)
 
         env = make_vec_env(env_id=args.env, env_kwargs=self.env_kwargs, n_envs=1)
         eval_env = make_vec_env(env_id=args.env, env_kwargs=self.env_kwargs, n_envs=1)
@@ -96,7 +98,7 @@ if __name__ == '__main__':
     #timestamp = datetime.datetime.now().strftime("%y%m%d_%H%M")
     args = parse_args()
     study = optuna.create_study(direction="maximize",
-    sampler=optuna.samplers.TPESampler(seed=42))
+                                sampler=optuna.samplers.TPESampler(seed=42))
     optuna.logging.set_verbosity(optuna.logging.INFO)
     study.optimize(Objective(args), n_trials=20)
     x=plot_optimization_history(study)

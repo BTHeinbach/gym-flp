@@ -1,18 +1,19 @@
 import numpy as np
-import gymnasium as gym
+import gym
 import pickle
 import os
 import math
 import matplotlib.pyplot as plt
-
-from gymnasium import spaces
+import json
+import gym_flp
+from gym import spaces
 from numpy.random import default_rng
 from PIL import Image
 from gym_flp import rewards
-
+from typing import Optional
 
 class QapEnv(gym.Env):
-    metadata = {'render.modes': ['rgb_array', 'human']}
+    metadata = {'render_modes': ['rgb_array', 'human']}
 
     def __init__(self,
                  mode=None,
@@ -22,22 +23,36 @@ class QapEnv(gym.Env):
                  step_size=None,
                  greenfield=None,
                  box=False,
-                 multi=False):
+                 multi=False,
+                 envId = 'qap',
+                 render_mode=None):
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-        self.DistanceMatrices, self.FlowMatrices = pickle.load(
-            open(os.path.join(__location__, 'instances/discrete', 'qap_matrices.pkl'), 'rb'))
         self.transport_intensity = None
         self.instance = instance
         self.mode = mode
+        assert render_mode is None or render_mode in self.metadata["render_modes"]
+        self.render_mode = render_mode
 
-        while not (
-                self.instance in self.DistanceMatrices.keys() or self.instance in self.FlowMatrices.keys() or self.instance in [
-            'Neos-n6', 'Neos-n7', 'Brewery']):
-            print('Available Problem Sets:', self.DistanceMatrices.keys())
-            self.instance = input('Pick a problem:').strip()
+        if instance != 'custom':
+            with open(os.path.join(__location__, r'instances', r'sample.json')) as file:
+                f = json.load(file)
+            while not (self.instance in [key.lower() for key in f.keys()]):
+                print('Could not find problem. Available problem sets:', f.keys())
+                self.instance = input('Pick a problem:').strip()
+        else:
+            n = int(input('Define problem size:').strip())
+            f = gym_flp.envs.instances.envBuilder.load_from_file(envId.split('-')[0], n)
 
-        self.D = self.DistanceMatrices[self.instance]
-        self.F = self.FlowMatrices[self.instance]
+        a = f[instance]['d']
+        b = [list(i.values()) if isinstance(i, dict) else i for i in a.values()]
+        distances = np.array(b, dtype=np.uint8)
+
+        c = f[instance]['f']
+        d = [list(i.values()) if isinstance(i, dict) else i for i in c.values()]
+        flows = np.array(d, dtype=np.uint8)
+
+        self.D = distances
+        self.F = flows
 
         # Determine problem size relevant for much stuff in here:
         self.n = len(self.D[0])
@@ -68,7 +83,15 @@ class QapEnv(gym.Env):
         self.movingTargetReward = np.inf
         self.MHC = rewards.mhc.MHC()  # Create an instance of class MHC in module mhc.py from package rewards
 
+    def _get_info(self):
+        return {
+            "distance": np.linalg.norm(
+                self._agent_location - self._target_location, ord=1
+            )
+        }
+
     def reset(self):
+        # super().reset(seed=seed)
         self.step_counter = 0  # Zählt die Anzahl an durchgeführten Aktionen
 
         self.internal_state = default_rng().choice(range(1, self.n + 1), size=self.n, replace=False)
@@ -119,16 +142,19 @@ class QapEnv(gym.Env):
         self.internal_state = np.array(fromState)
         state = np.array(self.internal_state) if self.mode == 'human' else np.array(self.get_image())
 
-        return state, reward, done, {'mhc': MHC}
+        observation = state
+        terminated = done
+
+        return observation, reward, terminated, {'mhc': MHC}
         # return newState, reward, done
 
     def render(self, mode=None):
 
         img = self.get_image()
 
-        # plt.imshow(img)
+        plt.imshow(img)
         plt.axis('off')
-        # plt.show()
+        plt.show()
         return np.array(img)
 
     def close(self):

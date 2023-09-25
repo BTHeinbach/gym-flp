@@ -26,7 +26,7 @@ def parse_args():
     parser.add_argument('--train', action="store_true", help='leave empty for debugging')
     parser.add_argument('--env', type=str, default='ofp-v0', help='environment name')
     parser.add_argument('--mode', type=str, default='rgb_array', help='state representation mode')
-    parser.add_argument('--instance', type=str, default='P6', help='problem instance')
+    parser.add_argument('--instance', type=str, default='custom', help='problem instance')
     parser.add_argument('--distance', type=str, default='r', help='distance metric')
     parser.add_argument('--step_size', type=int, default=1, help='step size for ofp envs')
     parser.add_argument('--box', action="store_true",  help='input box to use box env, if omitted uses discrete')
@@ -112,7 +112,8 @@ if __name__ == '__main__':
         'mode': args.mode,
         'instance': args.instance,
         'box': args.box,
-        'multi': args.multi
+        'multi': args.multi,
+        'envId': args.env
     }
     env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
     eval_env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
