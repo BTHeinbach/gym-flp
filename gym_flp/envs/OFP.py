@@ -87,10 +87,13 @@ class OfpEnv(gym.Env):
         self.fac_area = np.array(problem_information['areas'], dtype=float)
         self.fac_width_y = np.array(problem_information['widths'], dtype=float)
         self.fac_length_x = np.array(problem_information['lengths'], dtype=float)
+
+        #self.fac_width_y = np.array([2, 4, 5, 3, 8, 6])
+        #self.fac_length_x = np.array([7, 12, 5, 6, 5, 9])
         self.plant_X = int(problem_information['plantX'])
         self.plant_Y = int(problem_information['plantY'])
 
-        if len(self.fac_width_y)==0  or len(self.fac_length_x) ==0:
+        if len(self.fac_width_y) == 0 or len(self.fac_length_x) == 0:
             y = [preprocessing.divisor(int(x)) for x in self.fac_area]
 
             y_ = [[x for x in z] for z in y]
@@ -184,7 +187,7 @@ class OfpEnv(gym.Env):
         state_prelim[2::4] = self.fac_width_y
         state_prelim[3::4] = self.fac_length_x
 
-        self.randomize = True
+        self.randomize = False
         # Create fixed positions for reset:
         if self.randomize:
             # Check if plant can be made square
@@ -349,13 +352,13 @@ class OfpEnv(gym.Env):
 
         if not self.state_space.contains(temp_state):
             done = True
-            p1 = -1
+            p1 = -2
             temp_state = np.array(old_state)
         else:
             p1 = 0
 
         if np.sum(collisions) > 0:
-            p2 = -1
+            p2 = -2
         else:
             p2 = 0
 
@@ -378,11 +381,11 @@ class OfpEnv(gym.Env):
         # elif np.sum(collisions)!=0:
         #    done = True
 
-        return np.array(self.state), mhc * (-1 + p1 + p2), done, {'mhc': mhc, 'collisions': sum(collisions), 'r': reward}
+        return np.array(self.state), reward + p1+ p2, done, {'mhc': mhc, 'collisions': sum(collisions), 'r': reward}
 
     def render(self, mode=None):
         return preprocessing.make_image_from_coordinates(coordinates=self.internal_state,
-                                                         canvas=255 * np.ones((self.plant_Y, self.plant_X, 3),
+                                                         canvas=255 * np.zeros((self.plant_Y, self.plant_X, 3),
                                                                               dtype=np.uint8),
                                                          flows=self.F)
 
