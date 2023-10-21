@@ -14,7 +14,7 @@ from gym_flp.util import preprocessing
 
 
 class OfpEnv(gym.Env):
-    metadata = {'render.modes': ['rgb_array', 'human']}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
     '''
     - This environment class assumes a (bounded) planar area on which facilities are located on a continuum.
@@ -189,7 +189,7 @@ class OfpEnv(gym.Env):
 
         self.randomize = False
         # Create fixed positions for reset:
-        if self.randomize:
+        if not self.randomize:
             # Check if plant can be made square
             if math.isqrt(self.n) ** 2 == self.n:
                 Y = np.floor(
@@ -359,6 +359,7 @@ class OfpEnv(gym.Env):
 
         if np.sum(collisions) > 0:
             p2 = -2
+            # print(np.sum(collisions))
         else:
             p2 = 0
 

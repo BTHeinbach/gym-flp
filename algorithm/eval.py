@@ -10,12 +10,13 @@ import os
 import imageio
 import tkinter as tk
 from tkinter import filedialog
+from copy import deepcopy
 import gym_flp
 
 
 def run(save_path=None):
 
-
+    trg_path = os.path.dirname(os.path.abspath(__file__))
 
     if save_path is None:
         root = tk.Tk()
@@ -40,33 +41,33 @@ def run(save_path=None):
     else:
         raise Exception(f"{algo}: Algorithm not recognized or supported")
 
-    final_model = RL.load(f"./models/{save_path}")
-    best_model = RL.load(f"./models/best_model/{save_path}/best_model.zip")
+    final_model = RL.load(f"{trg_path}/models/{save_path}")
+    best_model = RL.load(f"{trg_path}/models/best_model/{save_path}/best_model.zip")
 
     env_kwargs = final_model.env_kwargs
     test_env_final = make_vec_env(env_id=env_kwargs['envId'], env_kwargs=env_kwargs, n_envs=1)
-    test_env_best = make_vec_env(env_id=env_kwargs['envId'], env_kwargs=env_kwargs, n_envs=1)
-
+    # test_env_best = make_vec_env(env_id=env_kwargs['envId'], env_kwargs=env_kwargs, n_envs=1)
 
 
     obs_final = test_env_final.reset()
-    obs_best = test_env_best.reset()
+    #obs_best = test_env_best.reset()
 
-    test_env_best.set_attr('internal_state', test_env_final.get_attr('internal_state'))
-    test_env_best.set_attr('state', test_env_final.get_attr('state'))
+    #test_env_best.set_attr('internal_state', test_env_final.get_attr('internal_state'))
+    #test_env_best.set_attr('state', test_env_final.get_attr('state'))
     obs_best = obs_final.copy()
+
+    test_env_best = deepcopy(test_env_final)
+
+
     img_first = Image.fromarray(test_env_best.render(mode='rgb_array'))
 
     if isinstance(test_env_final, VecTransposeImage) or isinstance(test_env_final, DummyVecEnv):
         start_cost_final = test_env_final.get_attr("last_cost")[0]
     else:
         start_cost_final = test_env_final.last_cost
+    start_cost_best = start_cost_final
 
-    if isinstance(test_env_final, VecTransposeImage) or isinstance(test_env_final, DummyVecEnv):
-        start_cost_best = test_env_final.get_attr("last_cost")[0]
-    else:
-        start_cost_best = test_env_best.last_cost
-
+    collisions=[]
     rewards = []
     mhc_final = []
     mhc_best = []
@@ -96,11 +97,15 @@ def run(save_path=None):
             img_best = Image.fromarray(test_env_best.render(mode='rgb_array'))
             imgs.append(img_best)
             dones[1] = done_best
+        
+        # print(test_env_final.get_attr('internal_state'), test_env_best.get_attr('internal_state'))
 
 
         rewards.append([reward_final[0], reward_best[0]])
         mhc_final.append(info_final[0]['mhc'])
         mhc_best.append(info_best[0]['mhc'])
+        collisions.append(info_final[0]['collisions'])
+
 
         axs[0, 0].imshow(img_final)
         axs[1, 0].imshow(img_best)
@@ -125,15 +130,16 @@ def run(save_path=None):
     experiment_results['cost_final'] = mhc_final
     experiment_results['cost_best'] = mhc_best
 
-    imageio.mimsave(f'gifs/{save_path}_test_env.gif', images, fps=10)
+    imageio.mimsave(f'{trg_path}/gifs/{save_path}_test_env.gif', images, duration=100)
 
-    new_path = os.path.join(os.getcwd(), 'experiments', save_path + '.png')
-    plt.imsave(new_path, images[-2])
-    plt.imsave(os.path.join(os.getcwd(), 'experiments', 'layout_ppo.png'), imgs[-2])
-    plt.imsave(os.path.join(os.getcwd(), 'experiments', 'start_layout_ppo.png'), img_first)
-    with open(f'{save_path}.json', 'w') as outfile:
-        json.dump(experiment_results, outfile)
+   # new_path = os.path.join(os.getcwd(), f'{trg_path}/experiments', save_path + '.png')
+   # plt.imsave(new_path, images[-2])
+   # plt.imsave(os.path.join(os.getcwd(), f'{trg_path}/experiments', 'layout_ppo.png'), imgs[-2])
+   # plt.imsave(os.path.join(os.getcwd(), f'{trg_path}/experiments', 'start_layout_ppo.png'), img_first)
+
     print("Evaluation finished")
+
+    return experiment_results
 
 if __name__ == '__main__':
 

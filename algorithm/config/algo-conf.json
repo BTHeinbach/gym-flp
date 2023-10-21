@@ -18,7 +18,7 @@
     "stats_window_size": 100,
     "tensorboard_log": null,
     "policy_kwargs": null,
-    "verbose": 1,
+    "verbose": 2,
     "seed": null,
     "device": "cpu",
     "_init_setup_model": true

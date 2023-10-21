@@ -15,7 +15,7 @@ def make_image_from_coordinates(coordinates: np.array, canvas: np.array, flows: 
     sources = np.sum(flows, axis=1)
     sinks = np.sum(flows, axis=0)
 
-    coordinates = np.array([12, 20,  2,  7, 15, 17,  4, 12, 15, 12,  5,  5, 19, 17,  3,  6, 14, 4,  8,  5,  6, 17,  6,  9])
+    #coordinates = np.array([12, 20,  2,  7, 15, 17,  4, 12, 15, 12,  5,  5, 19, 17,  3,  6, 14, 4,  8,  5,  6, 17,  6,  9])
 
     p = np.arange(len(coordinates) / 4)
     r = np.ones(shape=p.shape).astype(int) * 0
