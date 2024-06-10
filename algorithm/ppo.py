@@ -26,7 +26,7 @@ def parse_args():
     parser.add_argument('--train', action="store_true", help='leave empty for debugging')
     parser.add_argument('--env', type=str, default='ofp-v0', help='environment name')
     parser.add_argument('--mode', type=str, default='rgb_array', help='state representation mode')
-    parser.add_argument('--instance', type=str, default='P6', help='problem instance')
+    parser.add_argument('--instance', type=str, default='TL05', help='problem instance')
     parser.add_argument('--distance', type=str, default='r', help='distance metric')
     parser.add_argument('--step_size', type=int, default=1, help='step size for ofp envs')
     parser.add_argument('--box', action="store_true",  help='input box to use box env, if omitted uses discrete')
@@ -112,8 +112,12 @@ if __name__ == '__main__':
         'mode': args.mode,
         'instance': args.instance,
         'box': args.box,
+        #'box': args.box,
         'multi': args.multi
     }
+    args.train = True
+
+
     env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
     eval_env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
     test_env_final = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
@@ -133,6 +137,8 @@ if __name__ == '__main__':
     f = 'box' if args.box else 'discrete'
     g = 'multi' if args.multi else 'single'
     h = int(args.train_steps)
+
+
 
     if args.train:
         save_path = f"{a}_{b}_{c}_{d}_{e}_{f}_{g}_{h}"
@@ -258,9 +264,9 @@ if __name__ == '__main__':
     experiment_results['cost_final'] = mhc_final
     experiment_results['cost_best'] = mhc_best
 
-    imgs[-2].save(r'experiments/ppo_2.png')
-    imgs[-1].save(r'experiments/ppo_1.png')
-    imgs[0].save(r'experiments/ppo_0.png')
+    imgs[-2].save(f'experiments/{save_path}_final.png')
+    imgs[-1].save(f'experiments/{save_path}_start_1.png')
+    imgs[0].save(f'experiments/{save_path}_start_2.png')
     imageio.mimsave(f'gifs/{save_path}_test_env.gif', images, fps=10)
 
     new_path = os.path.join(os.getcwd(), 'experiments', save_path + '.png')

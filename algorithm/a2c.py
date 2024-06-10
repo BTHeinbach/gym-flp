@@ -259,9 +259,9 @@ if __name__ == '__main__':
 
     #imageio.mimsave(f'gifs/{save_path}_test_env.gif', images, fps=10)
 
-    imgs[-2].save(f'experiments/{save_path}_2.png')
-    imgs[-1].save(f'experiments/{save_path}_1.png')
-    imgs[0].save(f'experiments/{save_path}_0.png')
+    imgs[-2].save(f'experiments/{save_path}_final.png')
+    imgs[-1].save(f'experiments/{save_path}_start_1.png')
+    imgs[0].save(f'experiments/{save_path}_start_2.png')
     imageio.mimsave(f'gifs/{save_path}_test_env.gif', images, fps=10)
 
     new_path = os.path.join(os.getcwd(), 'experiments', save_path + '.png')

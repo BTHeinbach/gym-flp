@@ -8,7 +8,7 @@ from gym import spaces
 from numpy.random import default_rng
 from gym_flp import rewards, util
 from gym_flp.util import preprocessing
-
+from PIL import Image
 
 class OfpEnv(gym.Env):
     metadata = {'render.modes': ['rgb_array', 'human']}
@@ -82,7 +82,7 @@ class OfpEnv(gym.Env):
         if self.fac_width_y is None or self.fac_length_x is None:
             y = [preprocessing.divisor(int(x)) for x in self.fac_area]
 
-            y_ = [[x for x in z if x > 2 and x < 42] for z in y]
+            y_ = [[x for x in z] for z in y]
             self.fac_length_x = np.array([i[int(np.floor(len(i) / 2))] if len(i) > 1 else i[-1] for i in y_])
             # self.fac_length_x = np.random.randint(self.min_side_length * self.aspect_ratio, np.min(self.fac_area),
             #                                      size=(self.n,))
@@ -119,8 +119,11 @@ class OfpEnv(gym.Env):
         # [self.fac_y, self.fac_x, self.fac_width_y, self.fac_length_x]
 
         if self.mode == "rgb_array":
-            if self.plant_Y < 36 or self.plant_X < 36:
-                self.plant_Y, self.plant_X = 36, 36
+             if self.plant_Y < 36 or self.plant_X < 36:
+                 imgY, imgX = 36, 36
+             else:
+                 imgY, imgX = self.plant_Y, self.plant_X
+
 
         self.lower_bounds = {'Y': np.zeros(self.n),
                              'X': np.zeros(self.n),
@@ -149,7 +152,7 @@ class OfpEnv(gym.Env):
         self.state_space = spaces.Box(low=observation_low, high=observation_high, dtype=np.uint8)
 
         if self.mode == "rgb_array":
-            self.observation_space = spaces.Box(low=0, high=255, shape=(self.plant_Y, self.plant_X, 3),
+            self.observation_space = spaces.Box(low=0, high=255, shape=(imgY, imgX, 3),
                                                 dtype=np.uint8)  # Image representation, channel-last for PyTorch CNNs
 
         elif self.mode == "human":
@@ -171,8 +174,10 @@ class OfpEnv(gym.Env):
         self.MHC = rewards.mhc.MHC()
         self.empty = np.zeros((self.plant_Y, self.plant_X, 3), dtype=np.uint8)
         self.last_cost = 0
+
         self.TM = None
-        self.randomize = True
+        self.randomize = False
+        print(self.n)
 
     def reset(self):
         state_prelim = self.state_space.sample()
@@ -180,8 +185,21 @@ class OfpEnv(gym.Env):
         state_prelim[3::4] = self.fac_length_x
 
         # Create fixed positions for reset:
-        if self.randomize:
+        if not self.randomize:
             # Check if plant can be made square
+
+            partitions = math.floor(math.sqrt(self.n))+1
+
+            X = np.floor(
+                np.outer(np.arange(start=0, stop=1.001, step=1 / partitions), np.max(self.upper_bounds['X'])))
+            Y = np.floor(
+                np.outer(np.arange(start=0, stop=1.001, step=1 / partitions), np.max(self.upper_bounds['Y'])))
+
+            state_prelim[1::4] = np.array([np.tile(i, partitions) for i in X[:-1]]).flatten()[:self.n]+np.floor((X[1]-X[0])/2)
+            state_prelim[0::4] = np.tile(Y.flatten()[:-1], partitions)[:self.n]+np.floor((Y[1]-Y[0])/2)
+
+
+            '''
             if math.isqrt(self.n) ** 2 == self.n:
                 Y = np.floor(
                     np.outer(np.arange(start=0, stop=1, step=1 / math.isqrt(self.n)), np.max(self.upper_bounds['Y'])))
@@ -189,21 +207,21 @@ class OfpEnv(gym.Env):
                     np.outer(np.arange(start=0, stop=1, step=1 / math.isqrt(self.n)), np.max(self.upper_bounds['X'])))
 
             elif len(util.preprocessing.divisor(self.n)) > 1:
-                divisors = util.preprocessing.divisor(self.n)
+                if preprocessing.is_prime(self.n):
+                    n = self.n+1
+                else:
+                    n = self.n
+
+                divisors = util.preprocessing.divisor(n)
                 stepsize_index = int(np.floor(len(divisors) / 2))
 
                 x_partition = divisors[stepsize_index]
                 y_partition = divisors[stepsize_index - 1]
-                X = np.floor(
-                    np.outer(np.arange(start=0, stop=1.001, step=1 / x_partition), np.max(self.upper_bounds['X'])))
-                Y = np.floor(
-                    np.outer(np.arange(start=0, stop=1.001, step=1 / y_partition), np.max(self.upper_bounds['Y'])))
 
                 # state_prelim[0::4] = np.tile(np.floor([(i+j)/2 for i, j in zip(Y[:, -1], Y[1:, ].flatten())]), x_partition)
                 # state_prelim[1::4] = np.tile(np.floor([(i+j)/2 for i, j in zip(X[:, -1], X[1:, ].flatten())]), y_partition)
+            '''
 
-                state_prelim[0::4] = np.tile(Y.flatten()[:-1], x_partition)
-                state_prelim[1::4] = np.tile(X.flatten()[:-1], y_partition)
 
 
         else:
@@ -229,7 +247,7 @@ class OfpEnv(gym.Env):
         mhc, self.TM = self.MHC.compute(self.D, self.F, np.array(range(1, self.n + 1)))
         self.last_cost = mhc
 
-        return np.array(self.state)
+        return np.array(Image.fromarray(self.state).resize((self.observation_space.shape[0],self.observation_space.shape[1]), resample=Image.NEAREST))
 
     def collision_test(self, state):
         collisions = []
@@ -294,20 +312,21 @@ class OfpEnv(gym.Env):
         elif isinstance(self.action_space, gym.spaces.Box):
             if multi:
                 for i in range(0, self.n):
-                    a_y = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['Y'],
-                                                                 x_max=self.upper_bounds['Y'], x=action[2 * i])).astype(
+                    a_y = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['Y'][i],
+                                                                 x_max=self.upper_bounds['Y'][i], x=action[2 * i])).astype(
                         int)
-                    a_x = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['X'],
-                                                                 x_max=self.upper_bounds['X'],
+                    a_x = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['X'][i],
+                                                                 x_max=self.upper_bounds['X'][i],
                                                                  x=action[2 * i + 1])).astype(int)
 
                     temp_state[4 * i] = a_y
                     temp_state[4 * i + 1] = a_x
 
             else:
-                i = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=0, x_max=self.n - 1, x=action[0])).astype(
+                i = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=0, x_max=self.n-1, x=action[0])).astype(
                     int)
 
+                #print(range(0, self.n))
                 a_y = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['Y'][i],
                                                              x_max=self.upper_bounds['Y'][i], x=action[1])).astype(int)
                 a_x = np.floor(preprocessing.rescale_actions(a=-1, b=1, x_min=self.lower_bounds['X'][i],
@@ -341,13 +360,13 @@ class OfpEnv(gym.Env):
 
         if not self.state_space.contains(temp_state):
             done = True
-            p1 = -1
+            p1 = 1
             temp_state = np.array(old_state)
         else:
             p1 = 0
 
         if np.sum(collisions) > 0:
-            p2 = -1
+            p2 = 1
         else:
             p2 = 0
 
@@ -370,13 +389,26 @@ class OfpEnv(gym.Env):
         # elif np.sum(collisions)!=0:
         #    done = True
 
-        return np.array(self.state), reward + p1 + p2, done, {'mhc': mhc, 'collisions': sum(collisions), 'r': reward}
+        elif isinstance(self.action_space, gym.spaces.Box):
+            if multi:
+                done = True
+                reward = -1*mhc
+                p1 = p1*mhc
+                p2 = p2*mhc
+
+
+        return np.array(Image.fromarray(self.state).resize((self.observation_space.shape[0],self.observation_space.shape[1]), resample=Image.NEAREST)), \
+               -1*mhc, \
+               done, \
+               {'mhc': mhc, 'collisions': sum(collisions), 'r': reward}
 
     def render(self, mode=None):
-        return preprocessing.make_image_from_coordinates(coordinates=self.internal_state,
+        xx = preprocessing.make_image_from_coordinates(coordinates=self.internal_state,
                                                          canvas=255 * np.ones((self.plant_Y, self.plant_X, 3),
                                                                               dtype=np.uint8),
                                                          flows=self.F)
+        return np.array(xx)
+        # return np.array(Image.fromarray(xx).resize((self.observation_space.shape[0],self.observation_space.shape[1]), resample=Image.NEAREST))
 
     def close(self):
         pass

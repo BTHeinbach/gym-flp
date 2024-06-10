@@ -111,8 +111,9 @@ if __name__ == '__main__':
         'mode': args.mode,
         'instance': args.instance,
         'box': args.box,
-        'multi': args.multi
+        'multi': args.multi,
     }
+
     env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
     eval_env = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
     test_env_final = make_vec_env(env_id=args.env, env_kwargs=env_kwargs, n_envs=1)
@@ -172,7 +173,7 @@ if __name__ == '__main__':
                                      #callback_after_eval=stop_train_callback
                                      )
 
-        model.learn(total_timesteps=args.train_steps, callback=eval_callback, progress_bar=True)
+        model.learn(total_timesteps=args.train_steps, callback=[eval_callback, video_recorder], progress_bar=True)
         model.save(f"./models/{save_path}")
 
         del model
@@ -192,6 +193,7 @@ if __name__ == '__main__':
     obs_best = test_env_best.reset()
     img_first = Image.fromarray(test_env_best.render(mode='rgb_array'))
 
+    print(test_env_best.get_attr('internal_state'))
     if isinstance(test_env_final, VecTransposeImage) or isinstance(test_env_final, DummyVecEnv):
         start_cost_final = test_env_final.get_attr("last_cost")[0]
     else:
@@ -230,8 +232,11 @@ if __name__ == '__main__':
             obs_best, reward_best, done_best, info_best = test_env_best.step(action_best)
             img_best = Image.fromarray(test_env_best.render(mode='rgb_array'))
             imgs.append(img_best)
+            print(test_env_best.get_attr('internal_state'))
             dones[1] = done_best
 
+        plt.imshow(img_best)
+        plt.show()
 
         rewards.append([reward_final[0], reward_best[0]])
         mhc_final.append(info_final[0]['mhc'])
@@ -263,9 +268,18 @@ if __name__ == '__main__':
     imageio.mimsave(f'gifs/{save_path}_test_env.gif', images, fps=10)
 
     new_path = os.path.join(os.getcwd(), 'experiments', save_path + '.png')
-    plt.imsave(new_path, images[-2])
-    plt.imsave(os.path.join(os.getcwd(), 'experiments', 'layout_ppo.png'), imgs[-2])
-    plt.imsave(os.path.join(os.getcwd(), 'experiments', 'start_layout_ppo.png'), img_first)
+
     with open(f'{save_path}.json', 'w') as outfile:
         json.dump(experiment_results, outfile)
+
+    print(len(imgs))
+    if len(imgs)>1:
+        imgs[-2].save(f'experiments/{save_path}_final.png')
+    imgs[-1].save(f'experiments/{save_path}_start_1.png')
+    imgs[0].save(f'experiments/{save_path}_start_2.png')
+
+    #plt.imsave(new_path, images[-1])
+    #plt.imsave(os.path.join(os.getcwd(), 'experiments', 'layout_sac.png'), imgs[-1])
+    #plt.imsave(os.path.join(os.getcwd(), 'experiments', 'start_layout_sac.png'), img_first)
+
 

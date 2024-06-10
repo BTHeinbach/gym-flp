@@ -1,5 +1,5 @@
 import numpy as np
-
+import math
 from gym import spaces
 
 
@@ -64,3 +64,9 @@ def divisor(n):
     for i in range(n):
         x = [i for i in range(1, n + 1) if not n % i]
     return x
+
+def is_prime(n):
+  for i in range(2,int(math.sqrt(n))+1):
+    if (n%i) == 0:
+      return False
+  return True
